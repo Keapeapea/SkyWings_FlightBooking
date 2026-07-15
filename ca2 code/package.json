@@ -1,0 +1,16 @@
+{
+  "name": "skywings-flight-booking",
+  "version": "1.0.0",
+  "description": "SkyWings Flight Booking Application - C237 CA2",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "connect-flash": "^0.1.1",
+    "ejs": "^3.1.9",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "mysql2": "^3.9.7"
+  }
+}

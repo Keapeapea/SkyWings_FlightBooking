@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Flights - SkyWings Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0;">Manage Flights</h2>
+                <a class="btn btn-accent" href="/admin/flights/add">+ Add Flight</a>
+            </div>
+            <form class="inline" action="/admin" method="GET" style="margin-top:16px;">
+                <div class="field">
+                    <label for="destination">Destination</label>
+                    <input type="text" id="destination" name="destination" value="<%= query.destination %>">
+                </div>
+                <div class="field">
+                    <label for="date">Departure Date</label>
+                    <input type="date" id="date" name="date" value="<%= query.date %>">
+                </div>
+                <div class="field">
+                    <label for="sort">Sort By</label>
+                    <select id="sort" name="sort">
+                        <option value="date_asc" <%= query.sort === 'date_asc' ? 'selected' : '' %>>Departure Date</option>
+                        <option value="price_asc" <%= query.sort === 'price_asc' ? 'selected' : '' %>>Price: Low to High</option>
+                        <option value="price_desc" <%= query.sort === 'price_desc' ? 'selected' : '' %>>Price: High to Low</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Filter</button>
+                <a href="/admin" class="btn" style="background:var(--muted);">Reset</a>
+            </form>
+        </div>
+
+        <% if (flights.length === 0) { %>
+            <div class="card empty-state">No flights found.</div>
+        <% } else { %>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Flight #</th>
+                            <th>Route</th>
+                            <th>Departure</th>
+                            <th>Price</th>
+                            <th>Seats</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% flights.forEach(f => { %>
+                            <tr>
+                                <td><%= f.flight_number %></td>
+                                <td><%= f.origin %> → <%= f.destination %></td>
+                                <td><%= new Date(f.departure_date).toDateString() %> <%= f.departure_time %></td>
+                                <td>$<%= Number(f.price).toFixed(2) %></td>
+                                <td><%= f.available_seats %> / <%= f.total_seats %></td>
+                                <td>
+                                    <div class="actions">
+                                        <a class="btn btn-sm" href="/admin/flights/edit/<%= f.id %>">Edit</a>
+                                        <form action="/admin/flights/delete/<%= f.id %>" method="POST" onsubmit="return confirm('Delete this flight? This also removes related bookings.');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>

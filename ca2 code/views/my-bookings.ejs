@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Bookings - SkyWings</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
+        <h2>My Bookings</h2>
+
+        <% if (bookings.length === 0) { %>
+            <div class="card empty-state">
+                You haven't booked any flights yet. <a href="/dashboard">Browse flights</a>
+            </div>
+        <% } else { %>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Flight</th>
+                            <th>Route</th>
+                            <th>Departure</th>
+                            <th>Passenger</th>
+                            <th>Pax</th>
+                            <th>Class</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% bookings.forEach(b => { %>
+                            <tr>
+                                <td><%= b.flight_number %></td>
+                                <td><%= b.origin %> → <%= b.destination %></td>
+                                <td><%= new Date(b.departure_date).toDateString() %> <%= b.departure_time %></td>
+                                <td><%= b.passenger_name %></td>
+                                <td><%= b.passenger_count %></td>
+                                <td><%= b.seat_class %></td>
+                                <td>$<%= Number(b.total_price).toFixed(2) %></td>
+                                <td><span class="badge <%= b.status %>"><%= b.status %></span></td>
+                                <td>
+                                    <div class="actions">
+                                        <a class="btn btn-sm" href="/bookings/edit/<%= b.id %>">Edit</a>
+                                        <form action="/bookings/delete/<%= b.id %>" method="POST" onsubmit="return confirm('Cancel this booking?');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Flight - SkyWings Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
+
+        <div class="card">
+            <h2>Edit Flight <%= flight.flight_number %></h2>
+            <form action="/admin/flights/edit/<%= flight.id %>" method="POST">
+                <div class="field">
+                    <label for="flight_number">Flight Number</label>
+                    <input type="text" id="flight_number" name="flight_number" value="<%= flight.flight_number %>" required>
+                </div>
+                <div class="field">
+                    <label for="airline">Airline</label>
+                    <input type="text" id="airline" name="airline" value="<%= flight.airline %>" required>
+                </div>
+                <div class="field">
+                    <label for="origin">Origin</label>
+                    <input type="text" id="origin" name="origin" value="<%= flight.origin %>" required>
+                </div>
+                <div class="field">
+                    <label for="destination">Destination</label>
+                    <input type="text" id="destination" name="destination" value="<%= flight.destination %>" required>
+                </div>
+                <div class="field">
+                    <label for="departure_date">Departure Date</label>
+                    <input type="date" id="departure_date" name="departure_date" value="<%= flight.departure_date %>" required>
+                </div>
+                <div class="field">
+                    <label for="departure_time">Departure Time</label>
+                    <input type="time" id="departure_time" name="departure_time" value="<%= flight.departure_time %>" required>
+                </div>
+                <div class="field">
+                    <label for="arrival_time">Arrival Time</label>
+                    <input type="time" id="arrival_time" name="arrival_time" value="<%= flight.arrival_time %>" required>
+                </div>
+                <div class="field">
+                    <label for="price">Price (economy, $)</label>
+                    <input type="number" id="price" name="price" step="0.01" min="0" value="<%= flight.price %>" required>
+                </div>
+                <div class="field">
+                    <label for="total_seats">Total Seats</label>
+                    <input type="number" id="total_seats" name="total_seats" min="1" value="<%= flight.total_seats %>" required>
+                </div>
+                <p class="meta">Currently booked: <%= flight.total_seats - flight.available_seats %> seat(s). Available seats will auto-adjust.</p>
+                <button type="submit" class="btn">Save Changes</button>
+                <a class="btn" style="background:var(--muted);" href="/admin">Cancel</a>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

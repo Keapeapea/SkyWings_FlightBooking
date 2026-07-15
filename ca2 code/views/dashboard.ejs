@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Browse Flights - SkyWings</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
+
+        <div class="card">
+            <h2>Search Flights</h2>
+            <form class="inline" action="/dashboard" method="GET">
+                <div class="field">
+                    <label for="destination">Destination</label>
+                    <input type="text" id="destination" name="destination" placeholder="e.g. Tokyo" value="<%= query.destination %>">
+                </div>
+                <div class="field">
+                    <label for="date">Departure Date</label>
+                    <input type="date" id="date" name="date" value="<%= query.date %>">
+                </div>
+                <div class="field">
+                    <label for="sort">Sort By</label>
+                    <select id="sort" name="sort">
+                        <option value="date_asc" <%= query.sort === 'date_asc' ? 'selected' : '' %>>Departure Date</option>
+                        <option value="price_asc" <%= query.sort === 'price_asc' ? 'selected' : '' %>>Price: Low to High</option>
+                        <option value="price_desc" <%= query.sort === 'price_desc' ? 'selected' : '' %>>Price: High to Low</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Search</button>
+                <a href="/dashboard" class="btn" style="background:var(--muted);">Reset</a>
+            </form>
+        </div>
+
+        <h2>Available Flights</h2>
+        <% if (flights.length === 0) { %>
+            <div class="card empty-state">No flights match your search. Try different criteria.</div>
+        <% } else { %>
+            <div class="flight-grid">
+                <% flights.forEach(f => { %>
+                    <div class="flight-card">
+                        <div class="route"><%= f.origin %> → <%= f.destination %></div>
+                        <div class="meta"><%= f.flight_number %> · <%= f.airline %></div>
+                        <div class="meta">📅 <%= new Date(f.departure_date).toDateString() %></div>
+                        <div class="meta">🕒 <%= f.departure_time %> - <%= f.arrival_time %></div>
+                        <div class="meta">
+                            <span class="badge <%= f.available_seats < 10 ? 'seats-low' : 'seats-ok' %>">
+                                <%= f.available_seats %> seats left
+                            </span>
+                        </div>
+                        <div class="price">$<%= Number(f.price).toFixed(2) %></div>
+                        <a class="btn" href="/book/<%= f.id %>">Book Now</a>
+                    </div>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>

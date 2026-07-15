@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Booking - SkyWings</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
+
+        <div class="card">
+            <h2>Edit Booking - <%= booking.flight_number %></h2>
+            <p class="meta"><%= booking.origin %> → <%= booking.destination %></p>
+            <p class="meta">Seats currently available on this flight: <strong><%= booking.available_seats %></strong> (excludes this booking)</p>
+
+            <form action="/bookings/edit/<%= booking.id %>" method="POST">
+                <div class="field">
+                    <label for="passenger_name">Passenger Full Name</label>
+                    <input type="text" id="passenger_name" name="passenger_name" value="<%= booking.passenger_name %>" required>
+                </div>
+                <div class="field">
+                    <label for="passenger_count">Number of Passengers</label>
+                    <input type="number" id="passenger_count" name="passenger_count" min="1" value="<%= booking.passenger_count %>" required>
+                </div>
+                <div class="field">
+                    <label for="seat_class">Seat Class</label>
+                    <select id="seat_class" name="seat_class">
+                        <option value="economy" <%= booking.seat_class === 'economy' ? 'selected' : '' %>>Economy (x1 price)</option>
+                        <option value="business" <%= booking.seat_class === 'business' ? 'selected' : '' %>>Business (x2 price)</option>
+                        <option value="first" <%= booking.seat_class === 'first' ? 'selected' : '' %>>First Class (x3 price)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Save Changes</button>
+                <a class="btn" style="background:var(--muted);" href="/my-bookings">Cancel</a>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

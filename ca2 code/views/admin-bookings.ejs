@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>All Bookings - SkyWings Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
+        <h2>All Customer Bookings</h2>
+
+        <% if (bookings.length === 0) { %>
+            <div class="card empty-state">No bookings yet.</div>
+        <% } else { %>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Flight</th>
+                            <th>Route</th>
+                            <th>Departure</th>
+                            <th>Passenger</th>
+                            <th>Pax</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% bookings.forEach(b => { %>
+                            <tr>
+                                <td><%= b.username %><br><span class="meta" style="color:var(--muted); font-size:0.8rem;"><%= b.email %></span></td>
+                                <td><%= b.flight_number %></td>
+                                <td><%= b.origin %> → <%= b.destination %></td>
+                                <td><%= new Date(b.departure_date).toDateString() %></td>
+                                <td><%= b.passenger_name %></td>
+                                <td><%= b.passenger_count %></td>
+                                <td>$<%= Number(b.total_price).toFixed(2) %></td>
+                                <td><span class="badge <%= b.status %>"><%= b.status %></span></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>

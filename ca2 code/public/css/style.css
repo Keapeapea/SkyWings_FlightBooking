@@ -1,0 +1,158 @@
+:root {
+    --primary: #0a5c9c;
+    --primary-dark: #073f6b;
+    --accent: #f5a623;
+    --bg: #f4f7fa;
+    --card: #ffffff;
+    --text: #1f2d3d;
+    --muted: #6b7a8d;
+    --danger: #d64545;
+    --success: #2e9e5b;
+    --border: #e1e8ef;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+nav {
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 14px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+nav .brand {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+}
+
+nav .links a {
+    color: #dce8f5;
+    text-decoration: none;
+    margin-left: 20px;
+    font-size: 0.95rem;
+}
+
+nav .links a:hover { color: var(--accent); }
+
+.container {
+    max-width: 1100px;
+    margin: 30px auto;
+    padding: 0 20px;
+}
+
+.card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+}
+
+h1, h2, h3 { color: var(--primary-dark); }
+
+.hero {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 60px 20px;
+    text-align: center;
+    border-radius: 0 0 20px 20px;
+}
+
+.hero h1 { color: #fff; font-size: 2.3rem; margin-bottom: 10px; }
+.hero p { font-size: 1.1rem; opacity: 0.9; }
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.btn:hover { background: var(--primary-dark); }
+.btn-accent { background: var(--accent); color: #3a2a00; }
+.btn-accent:hover { background: #d98e12; }
+.btn-danger { background: var(--danger); }
+.btn-danger:hover { background: #b53838; }
+.btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+
+form { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
+
+form.inline { flex-direction: row; align-items: end; flex-wrap: wrap; max-width: none; gap: 12px; }
+
+label { font-weight: 600; font-size: 0.9rem; color: var(--muted); }
+
+input, select {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.flash {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
+
+.flash.success { background: #e3f6ea; color: var(--success); border: 1px solid #b7e6c6; }
+.flash.error { background: #fdeaea; color: var(--danger); border: 1px solid #f3bcbc; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+th { color: var(--muted); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.badge.confirmed { background: #e3f6ea; color: var(--success); }
+.badge.cancelled { background: #fdeaea; color: var(--danger); }
+.badge.seats-low { background: #fff2e0; color: #b56b00; }
+.badge.seats-ok { background: #e3f6ea; color: var(--success); }
+
+.flight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.flight-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+}
+
+.flight-card .route { font-size: 1.1rem; font-weight: 700; color: var(--primary-dark); }
+.flight-card .meta { color: var(--muted); font-size: 0.85rem; margin: 6px 0; }
+.flight-card .price { font-size: 1.3rem; font-weight: 700; color: var(--accent); margin: 10px 0; }
+
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+
+.empty-state { text-align: center; padding: 40px; color: var(--muted); }

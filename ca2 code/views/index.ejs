@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SkyWings - Book Your Next Flight</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+
+    <div class="hero">
+        <h1>Fly Further with SkyWings</h1>
+        <p>Search, compare, and book flights in just a few clicks.</p>
+        <div style="margin-top: 24px;">
+            <% if (user) { %>
+                <a class="btn btn-accent" href="<%= user.role === 'admin' ? '/admin' : '/dashboard' %>">Go to Dashboard</a>
+            <% } else { %>
+                <a class="btn btn-accent" href="/register">Get Started</a>
+                <a class="btn" style="background:#ffffff33; margin-left:10px;" href="/login">Login</a>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="container">
+        <%- include('partials/flash') %>
+        <div class="card">
+            <h2>Why book with SkyWings?</h2>
+            <p style="color:var(--muted)">
+                Browse real-time flight availability, filter by destination or date, and manage your
+                bookings all in one place. Create an account to start booking flights today.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
