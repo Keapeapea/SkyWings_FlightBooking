@@ -7,25 +7,27 @@ const app = express();
 
 // ---------- Database connection ----------
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'YOUR_MYSQL_PASSWORD',
-    database: 'skywings_db',
-    dateStrings: true // return DATE/TIME columns as plain strings (avoids timezone shifting issues)
+    host: 'c237-adib-mysql.mysql.database.azure.com',
+    user: 'c237_019',
+    password: 'c237019@2026!',
+    database: 'c237_019_team5_userdb',
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 db.connect((err) => {
     if (err) {
         throw err;
     }
-    console.log('Connected to skywings_db');
+    console.log('Connected to c237_019_team5_userdb');
 });
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static('public'));
 
 app.use(session({
-    secret: 'skywings_secret_key',
+    secret: 'c237_019_team5_secret_key',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
