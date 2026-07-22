@@ -487,6 +487,34 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
     });
 });
 
+app.post('/admin/bookings/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
+    const bookingId = req.params.id;
+
+    // No user_id check here - admin can cancel any booking, unlike
+    // the passenger-facing /bookings/delete/:id route.
+    db.query('SELECT * FROM bookings WHERE id = ?', [bookingId], (err, results) => {
+        if (err) throw err;
+        if (results.length === 0) return res.status(404).send('Booking not found');
+
+        const booking = results[0];
+        if (booking.status === 'cancelled') {
+            req.flash('error', 'Booking is already cancelled.');
+            return res.redirect('/admin/bookings');
+        }
+
+        db.query('UPDATE bookings SET status = ? WHERE id = ?', ['cancelled', bookingId], (err) => {
+            if (err) throw err;
+
+            db.query('UPDATE flights SET available_seats = available_seats + ? WHERE id = ?',
+                [booking.passenger_count, booking.flight_id], (err) => {
+                    if (err) throw err;
+                    req.flash('success', 'Booking cancelled by admin.');
+                    res.redirect('/admin/bookings');
+                });
+        });
+    });
+});
+
 // Starting the server
 app.listen(3000, () => {
     console.log('SkyWings server started on http://localhost:3000');

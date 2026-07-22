@@ -26,6 +26,7 @@
                             <th>Pax</th>
                             <th>Total</th>
                             <th>Status</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -39,6 +40,13 @@
                                 <td><%= b.passenger_count %></td>
                                 <td>$<%= Number(b.total_price).toFixed(2) %></td>
                                 <td><span class="badge <%= b.status %>"><%= b.status %></span></td>
+                                <td>
+                                    <% if (b.status === 'confirmed') { %>
+                                        <form action="/admin/bookings/delete/<%= b.id %>" method="POST" onsubmit="return confirm('Cancel this booking?');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                        </form>
+                                    <% } %>
+                                </td>
                             </tr>
                         <% }) %>
                     </tbody>
