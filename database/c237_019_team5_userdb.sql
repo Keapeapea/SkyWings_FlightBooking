@@ -60,3 +60,5 @@ INSERT INTO flights (flight_number, airline, origin, destination, departure_date
 ('SQ301', 'SkyWings Airlines', 'Singapore', 'Sydney', '2026-08-15', '10:15:00', '20:40:00', 650.00, 200, 200),
 ('SQ402', 'SkyWings Airlines', 'Singapore', 'Bangkok', '2026-08-09', '07:00:00', '08:25:00', 180.00, 150, 150),
 ('SQ508', 'SkyWings Airlines', 'Singapore', 'Seoul', '2026-08-20', '13:45:00', '21:30:00', 520.00, 190, 190);
+
+SELECT USER(), CURRENT_USER();

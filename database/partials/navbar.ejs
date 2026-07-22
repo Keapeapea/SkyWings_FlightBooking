@@ -1,0 +1,19 @@
+<nav>
+    <a class="brand" href="/">✈ SkyWings</a>
+    <div class="links">
+        <% if (user) { %>
+            <% if (user.role === 'admin') { %>
+                <a href="/admin">Manage Flights</a>
+                <a href="/admin/bookings">All Bookings</a>
+            <% } else { %>
+                <a href="/dashboard">Browse Flights</a>
+                <a href="/my-bookings">My Bookings</a>
+            <% } %>
+            <span style="color:#dce8f5; margin-left:20px;">Hi, <%= user.username %></span>
+            <a href="/logout">Logout</a>
+        <% } else { %>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+        <% } %>
+    </div>
+</nav>

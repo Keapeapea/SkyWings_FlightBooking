@@ -41,16 +41,43 @@
             <div class="flight-grid">
                 <% flights.forEach(f => { %>
                     <div class="flight-card">
-                        <div class="route"><%= f.origin %> → <%= f.destination %></div>
-                        <div class="meta"><%= f.flight_number %> · <%= f.airline %></div>
-                        <div class="meta">📅 <%= new Date(f.departure_date).toDateString() %></div>
-                        <div class="meta">🕒 <%= f.departure_time %> - <%= f.arrival_time %></div>
-                        <div class="meta">
+                        <div class="route-row">
+                            <div class="airport">
+                                <div class="code"><%= f.origin %></div>
+                            </div>
+                            <div class="route-line">
+                                <span class="dot"></span>
+                                <span class="line"></span>
+                                <span class="plane">✈</span>
+                                <span class="line"></span>
+                                <span class="dot"></span>
+                            </div>
+                            <div class="airport right">
+                                <div class="code"><%= f.destination %></div>
+                            </div>
+                        </div>
+                        <div class="meta-row">
+                            <div>
+                                <div class="label">Depart</div>
+                                <div class="value"><%= f.departure_time %></div>
+                            </div>
+                            <div class="center">
+                                <%= new Date(f.departure_date).toDateString() %>
+                            </div>
+                            <div style="text-align:right;">
+                                <div class="label">Arrive</div>
+                                <div class="value"><%= f.arrival_time %></div>
+                            </div>
+                        </div>
+                        <div class="seats-row">
                             <span class="badge <%= f.available_seats < 10 ? 'seats-low' : 'seats-ok' %>">
                                 <%= f.available_seats %> seats left
                             </span>
                         </div>
-                        <div class="price">$<%= Number(f.price).toFixed(2) %></div>
+                        <div class="bottom-row">
+                            <div class="airline"><%= f.flight_number %> · <%= f.airline %></div>
+                            <div class="price">$<%= Number(f.price).toFixed(2) %><span class="per">/ adult</span></div>
+                        </div>
                         <a class="btn" href="/book/<%= f.id %>">Book Now</a>
                     </div>
                 <% }) %>
