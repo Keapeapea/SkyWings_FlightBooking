@@ -17,10 +17,13 @@
     --success-pale: #e3f6ea;
     --border: #e2e8f0;
     --radius: 18px;
+    --font-family: 'Poppins', sans-serif;
 }
 
 * { box-sizing: border-box; }
-
+* {
+    font-family: var(--font-family);
+}
 body {
     margin: 0;
     font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
@@ -446,3 +449,115 @@ tbody tr:hover { background: #f7fafc; }
     color: #fff;
     border-color: #2b5fd9;
 }
+
+/* ---------- Passenger card (for multiple passengers) ---------- */
+.btn-add {
+    display: inline-block;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #2b5fd9;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    margin: 8px 0 16px;
+}
+
+/* the boxed dropdown block from your sketch */
+.pax-box {
+    position: relative;
+    border: 1.5px solid #555;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+    background: #fff;
+}
+
+.btn-remove {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid #d33;
+    background: #fff;
+    color: #d33;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.input-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.85rem;
+    color: #7c8aa0;   /* same as your other labels */
+}
+ /* ---------- Gender radio buttons (for passenger card) ---------- */
+.gender-options {
+    display: flex;
+    gap: 24px;
+    margin-top: 6px;
+}
+
+.gender-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.gender-option input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* ----------class tabs---------- */
+.class-tabs {
+    display: flex;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 16px;
+}
+
+.class-tab {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    background: none;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    position: relative;
+}
+
+.class-tab.active {
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.class-tab.active::after {
+    content: "";
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 3px;
+    border-radius: 2px;
+    background: #1a1a2e;
+}
+
+/* fare card tier label */
+.fare-tier {
+    color: #888;
+    font-size: 0.85rem;
+    margin: 8px 0;
+}
+

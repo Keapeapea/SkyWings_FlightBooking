@@ -5,6 +5,7 @@ const flash = require('connect-flash');
 
 const app = express();
 
+
 // ---------- Database connection ----------
 const db = mysql.createConnection({
     host: 'c237-adib-mysql.mysql.database.azure.com',
@@ -212,10 +213,9 @@ app.get('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
 
 app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     const flightId = req.params.flightId;
-    const { passenger_name, passenger_count, seat_class } = req.body;
-    const passengerCount = parseInt(passenger_count, 10);
+    const {first_name, last_name, passenger_number, passenger_gender,passenger_email,passenger_passport,passenger_dob,fare } = req.body;
 
-    if (!passenger_name || !passengerCount || passengerCount < 1) {
+    if (!first_name || !last_name || !passenger_number || !passenger_gender || !passenger_email || !passenger_passport || !passenger_dob || !fare) {
         req.flash('error', 'Please provide valid passenger details.');
         return res.redirect(`/book/${flightId}`);
     }
@@ -475,6 +475,24 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
         res.render('admin-bookings', { bookings });
     });
 });
+
+
+/* add passenger*/ 
+app.get("/book/:id", (req, res) => {
+    const id = req.params.id;
+    db.query(
+        "SELECT * FROM flights WHERE id = ?",
+        [id],
+        (err, results) => {
+            if (err) throw err;
+            res.render("book", {
+                flight: results[0]
+            });
+        }
+    );
+});
+
+
 
 // Starting the server
 app.listen(3000, () => {
