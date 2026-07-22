@@ -5,17 +5,9 @@ const session = require('express-session');
 const flash = require('connect-flash');
  
 const app = express();
-<<<<<<< HEAD
 
 
 // ---------- Database connection ----------
-=======
- 
-// ============================================================
-// Database connection
-// ============================================================
- 
->>>>>>> 9d8cbf2535e7ef599a1dbde1fbad5b2923f2ad61
 const db = mysql.createConnection({
     host: 'c237-adib-mysql.mysql.database.azure.com',
     user: 'c237_019',
@@ -253,16 +245,9 @@ app.get('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
  
 app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     const flightId = req.params.flightId;
-<<<<<<< HEAD
     const {first_name, last_name, passenger_number, passenger_gender,passenger_email,passenger_passport,passenger_dob,fare } = req.body;
 
     if (!first_name || !last_name || !passenger_number || !passenger_gender || !passenger_email || !passenger_passport || !passenger_dob || !fare) {
-=======
-    const { passenger_name, seat_class } = req.body;
-    const passengerCount = parseInt(req.body.passenger_count, 10);
- 
-    if (!passenger_name || !passengerCount || passengerCount < 1) {
->>>>>>> 9d8cbf2535e7ef599a1dbde1fbad5b2923f2ad61
         req.flash('error', 'Please provide valid passenger details.');
         return res.redirect(`/book/${flightId}`);
     }
@@ -574,7 +559,6 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
         res.render('admin-bookings', { bookings });
     });
 });
-<<<<<<< HEAD
 
 
 /* add passenger*/ 
@@ -595,98 +579,6 @@ app.get("/book/:id", (req, res) => {
 
 
 // Starting the server
-=======
- 
-// ---------- Student E: Admin cancel booking ----------
- 
-app.post('/admin/bookings/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
-    const bookingId = req.params.id;
- 
-    db.query('SELECT * FROM bookings WHERE id = ?', [bookingId], (err, results) => {
-        if (err) throw err;
-        if (results.length === 0) return res.status(404).send('Booking not found');
- 
-        const booking = results[0];
-        if (booking.status === 'cancelled') {
-            req.flash('error', 'Booking is already cancelled.');
-            return res.redirect('/admin/bookings');
-        }
-        if (booking.status === 'flight removed') {
-            req.flash('error', 'This booking is already marked as flight removed.');
-            return res.redirect('/admin/bookings');
-        }
- 
-        db.query('UPDATE bookings SET status = ?, cancelled_by = ? WHERE id = ?', ['cancelled', 'admin', bookingId], (err) => {
-            if (err) throw err;
- 
-            db.query('UPDATE flights SET available_seats = available_seats + ? WHERE id = ?',
-                [booking.passenger_count, booking.flight_id], (err) => {
-                    if (err) throw err;
-                    req.flash('success', 'Booking cancelled by admin.');
-                    res.redirect('/admin/bookings');
-                });
-        });
-    });
-});
- 
-// ---------- Student E: Admin reactivate booking ----------
- 
-app.post('/admin/bookings/reactivate/:id', checkAuthenticated, checkAdmin, (req, res) => {
-    const bookingId = req.params.id;
- 
-    db.query('SELECT * FROM bookings WHERE id = ?', [bookingId], (err, results) => {
-        if (err) throw err;
-        if (results.length === 0) return res.status(404).send('Booking not found');
- 
-        const booking = results[0];
- 
-        // Only bookings the admin cancelled can be reactivated this way -
-        // not ones the customer cancelled, and not ones whose flight was removed.
-        if (booking.status !== 'cancelled' || booking.cancelled_by !== 'admin') {
-            req.flash('error', 'This booking cannot be reactivated.');
-            return res.redirect('/admin/bookings');
-        }
- 
-        if (!booking.flight_id) {
-            req.flash('error', 'Cannot reactivate - the flight for this booking no longer exists.');
-            return res.redirect('/admin/bookings');
-        }
- 
-        db.query('SELECT available_seats FROM flights WHERE id = ?', [booking.flight_id], (err, flightResults) => {
-            if (err) throw err;
-            if (flightResults.length === 0) {
-                req.flash('error', 'Cannot reactivate - the flight for this booking no longer exists.');
-                return res.redirect('/admin/bookings');
-            }
- 
-            const flight = flightResults[0];
- 
-            // Seats were given back when this was cancelled - taking them
-            // again might not be possible if other bookings filled the flight since.
-            if (booking.passenger_count > flight.available_seats) {
-                req.flash('error', `Cannot reactivate - only ${flight.available_seats} seat(s) left on this flight now.`);
-                return res.redirect('/admin/bookings');
-            }
- 
-            db.query('UPDATE bookings SET status = ?, cancelled_by = ? WHERE id = ?', ['confirmed', null, bookingId], (err) => {
-                if (err) throw err;
- 
-                db.query('UPDATE flights SET available_seats = available_seats - ? WHERE id = ?',
-                    [booking.passenger_count, booking.flight_id], (err) => {
-                        if (err) throw err;
-                        req.flash('success', 'Booking reactivated.');
-                        res.redirect('/admin/bookings');
-                    });
-            });
-        });
-    });
-});
- 
-// ============================================================
-// Start server
-// ============================================================
- 
->>>>>>> 9d8cbf2535e7ef599a1dbde1fbad5b2923f2ad61
 app.listen(3000, () => {
     console.log('SkyWings server started on http://localhost:3000');
 }); 
