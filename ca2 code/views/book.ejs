@@ -39,7 +39,7 @@
                     <div class="value"><%= flight.departure_time %></div>
                 </div>
                 <div class="item">
-                    <div class="label">Price / pax</div>
+                    <div class="label">Base Price</div>
                     <div class="value">$<%= Number(flight.price).toFixed(2) %></div>
                 </div>
                 <div class="item">
@@ -47,31 +47,82 @@
                     <div class="value"><%= flight.available_seats %></div>
                 </div>
             </div>
-
-            <div class="boarding-bottom">
-                <h2 style="margin-top:0;">Passenger Details</h2>
-                <form action="/book/<%= flight.id %>" method="POST">
-                    <div class="field">
-                        <label for="passenger_name">Passenger Full Name</label>
-                        <input type="text" id="passenger_name" name="passenger_name" required>
-                    </div>
-                    <div class="field">
-                        <label for="passenger_count">Number of Passengers</label>
-                        <input type="number" id="passenger_count" name="passenger_count" min="1" max="<%= flight.available_seats %>" value="1" required>
-                    </div>
-                    <div class="field">
-                        <label for="seat_class">Seat Class</label>
-                        <select id="seat_class" name="seat_class">
-                            <option value="economy">Economy (x1 price)</option>
-                            <option value="business">Business (x2 price)</option>
-                            <option value="first">First Class (x3 price)</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-accent">Confirm Booking</button>
-                </form>
-            </div>
-            <div class="barcode"></div>
         </div>
+
+        <form action="/book/<%= flight.id %>" method="POST" id="bookingForm">
+            <div class="card" style="margin-top:16px;">
+                <h2 style="margin-top:0;">Passenger Details</h2>
+                <div class="field">
+                    <label for="passenger_name">Passenger Full Name</label>
+                    <input type="text" id="passenger_name" name="passenger_name" required>
+                </div>
+                <div class="field">
+                    <label for="passenger_count">Number of Passengers</label>
+                    <input type="number" id="passenger_count" name="passenger_count"
+                           min="1" max="<%= flight.available_seats %>" value="1" required>
+                </div>
+            </div>
+
+            <h2 style="margin:20px 0 12px;">Select Fare</h2>
+
+            <div class="fare-list">
+
+                <!-- ECONOMY -->
+                <label class="fare-card">
+                    <input type="radio" name="seat_class" value="economy" checked>
+                    <div class="fare-card-inner">
+                        <div class="fare-head">
+                            <span class="fare-name">Economy</span>
+                            <span class="fare-price">$<%= Number(flight.price).toFixed(2) %> <small>/ person</small></span>
+                        </div>
+                        <ul class="fare-baggage">
+                            <li class="ok">🧳 Carry-on baggage: 1 piece</li>
+                            <li class="no">✕ No free checked baggage</li>
+                            <li class="no">✕ Cannot be cancelled or changed</li>
+                        </ul>
+                        <div class="fare-select-indicator">Select</div>
+                    </div>
+                </label>
+
+                <!-- BUSINESS -->
+                <label class="fare-card">
+                    <input type="radio" name="seat_class" value="business">
+                    <div class="fare-card-inner">
+                        <div class="fare-head">
+                            <span class="fare-name">Business</span>
+                            <span class="fare-price">$<%= Number(flight.price * 2).toFixed(2) %> <small>/ person</small></span>
+                        </div>
+                        <ul class="fare-baggage">
+                            <li class="ok">🧳 Carry-on baggage: 2 pieces</li>
+                            <li class="ok">🎒 Checked baggage: 20kg included</li>
+                            <li class="ok">🔁 Free date change</li>
+                        </ul>
+                        <div class="fare-select-indicator">Select</div>
+                    </div>
+                </label>
+
+                <!-- FIRST CLASS -->
+                <label class="fare-card">
+                    <input type="radio" name="seat_class" value="first">
+                    <div class="fare-card-inner">
+                        <div class="fare-head">
+                            <span class="fare-name">First Class</span>
+                            <span class="fare-price">$<%= Number(flight.price * 3).toFixed(2) %> <small>/ person</small></span>
+                        </div>
+                        <ul class="fare-baggage">
+                            <li class="ok">🧳 Carry-on baggage: 2 pieces</li>
+                            <li class="ok">🎒 Checked baggage: 30kg included</li>
+                            <li class="ok">✅ Free cancellation & change</li>
+                        </ul>
+                        <div class="fare-select-indicator">Select</div>
+                    </div>
+                </label>
+
+            </div>
+
+            <button type="submit" class="btn btn-accent" style="margin-top:16px;width:100%;">Confirm Booking</button>
+        </form>
+        <div class="barcode"></div>
     </div>
 </body>
 </html>

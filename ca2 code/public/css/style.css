@@ -355,4 +355,94 @@ tbody tr:hover { background: #f7fafc; }
 
 .actions { display: flex; gap: 8px; margin-top: 10px; }
 
+
+
+/*------- Booking option page ------*/
 .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+
+.fare-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fare-card {
+    display: block;
+    cursor: pointer;
+}
+
+.fare-card input[type="radio"] {
+    display: none;
+}
+
+.fare-card-inner {
+    border: 2px solid #e2e2e2;
+    border-radius: 12px;
+    padding: 16px;
+    background: #fff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fare-card input[type="radio"]:checked + .fare-card-inner {
+    border-color: #0f9d8c; /* teal accent, like the screenshot */
+    box-shadow: 0 0 0 1px #0f9d8c;
+}
+
+.fare-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+}
+
+.fare-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.fare-price {
+    font-weight: 700;
+    color: #2b5fd9;
+    font-size: 1.2rem;
+}
+
+.fare-price small {
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.fare-baggage {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+}
+
+.fare-baggage li {
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+}
+
+.fare-baggage li.ok {
+    color: #333;
+}
+
+.fare-baggage li.no {
+    color: #999;
+}
+
+.fare-select-indicator {
+    display: inline-block;
+    padding: 6px 18px;
+    border-radius: 8px;
+    border: 1px solid #2b5fd9;
+    color: #2b5fd9;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.fare-card input[type="radio"]:checked + .fare-card-inner .fare-select-indicator {
+    background: #2b5fd9;
+    color: #fff;
+    border-color: #2b5fd9;
+}
