@@ -199,8 +199,20 @@ tbody tr:hover { background: #f7fafc; }
 }
 .badge.confirmed { background: var(--success-pale); color: var(--success); }
 .badge.cancelled { background: var(--danger-pale); color: var(--danger); }
+.badge.flight-removed { background: #fef3c7; color: #b45309; }
 .badge.seats-low { background: #fff2e0; color: #b56b00; }
 .badge.seats-ok { background: var(--teal-pale); color: var(--teal-dark); }
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.muted-text {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
 
 /* ---------- Flight cards (styled after the "Select Flight" screen) ---------- */
 .flight-grid {
@@ -280,6 +292,86 @@ tbody tr:hover { background: #f7fafc; }
 
 /* legacy support (kept in case referenced elsewhere) */
 .flight-card .meta { color: var(--muted); font-size: 0.85rem; margin: 6px 0; }
+
+@media (max-width: 768px) {
+    nav {
+        padding: 14px 16px;
+    }
+
+    nav .links {
+        width: 100%;
+        margin-top: 8px;
+        gap: 10px;
+    }
+
+    nav .links a {
+        margin-left: 0;
+        margin-right: 10px;
+    }
+
+    .container {
+        padding: 0 14px;
+        margin: 20px auto;
+    }
+
+    .card {
+        padding: 18px;
+    }
+
+    .hero {
+        padding: 56px 16px 44px;
+    }
+
+    .hero h1 {
+        font-size: 1.9rem;
+    }
+
+    form {
+        max-width: none;
+    }
+
+    .btn,
+    .btn-sm {
+        width: 100%;
+        text-align: center;
+    }
+
+    .actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    table,
+    thead,
+    tbody,
+    th,
+    td,
+    tr {
+        display: block;
+    }
+
+    thead {
+        display: none;
+    }
+
+    tbody tr {
+        border-bottom: 1px solid var(--border);
+        padding: 10px 0;
+    }
+
+    td {
+        border-bottom: none;
+        padding: 8px 0;
+    }
+
+    td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 4px;
+    }
+}
 
 /* ---------- Boarding-pass style booking card ---------- */
 .boarding-card { padding: 0; overflow: hidden; }

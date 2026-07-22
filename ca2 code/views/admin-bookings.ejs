@@ -26,19 +26,34 @@
                             <th>Pax</th>
                             <th>Total</th>
                             <th>Status</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <% bookings.forEach(b => { %>
+                            <% const badgeClass = b.status === 'flight removed' ? 'flight-removed' : b.status; %>
                             <tr>
-                                <td><%= b.username %><br><span class="meta" style="color:var(--muted); font-size:0.8rem;"><%= b.email %></span></td>
-                                <td><%= b.flight_number %></td>
-                                <td><%= b.origin %> → <%= b.destination %></td>
-                                <td><%= new Date(b.departure_date).toDateString() %></td>
-                                <td><%= b.passenger_name %></td>
-                                <td><%= b.passenger_count %></td>
-                                <td>$<%= Number(b.total_price).toFixed(2) %></td>
-                                <td><span class="badge <%= b.status %>"><%= b.status %></span></td>
+                                <td data-label="Customer"><%= b.username %><br><span class="meta" style="color:var(--muted); font-size:0.8rem;"><%= b.email %></span></td>
+                                <td data-label="Flight"><%= b.flight_number %></td>
+                                <td data-label="Route"><%= b.origin %> → <%= b.destination %></td>
+                                <td data-label="Departure"><%= b.departure_date ? new Date(b.departure_date).toDateString() : 'N/A' %></td>
+                                <td data-label="Passenger"><%= b.passenger_name %></td>
+                                <td data-label="Pax"><%= b.passenger_count %></td>
+                                <td data-label="Total">$<%= Number(b.total_price).toFixed(2) %></td>
+                                <td data-label="Status"><span class="badge <%= badgeClass %>"><%= b.status %></span></td>
+                                <td data-label="Actions">
+                                    <% if (b.status === 'confirmed') { %>
+                                        <form action="/admin/bookings/delete/<%= b.id %>" method="POST" onsubmit="return confirm('Cancel this booking?');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                        </form>
+                                    <% } else if (b.status === 'cancelled' && (b.cancelled_by === 'admin' || b.cancelled_by === null || b.cancelled_by === '')) { %>
+                                        <form action="/admin/bookings/reactivate/<%= b.id %>" method="POST" onsubmit="return confirm('Reactivate this booking?');">
+                                            <button type="submit" class="btn btn-sm">Reactivate</button>
+                                        </form>
+                                    <% } else { %>
+                                        <span class="muted-text">No action</span>
+                                    <% } %>
+                                </td>
                             </tr>
                         <% }) %>
                     </tbody>
