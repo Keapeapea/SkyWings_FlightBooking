@@ -239,8 +239,8 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
         const classMultiplier = seat_class === 'business' ? 2 : seat_class === 'first' ? 3 : 1;
         const totalPrice = flight.price * passengerCount * classMultiplier;
 
-        const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price)
-                            VALUES (?, ?, ?, ?, ?, ?)`;
+        const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, status)
+                            VALUES (?, ?, ?, ?, ?, ?, 'confirmed')`;
         db.query(insertSql, [req.session.user.id, flightId, passenger_name, passengerCount, seat_class, totalPrice], (err) => {
             if (err) throw err;
 
@@ -257,10 +257,13 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
 
 // ---------- STUDENT C: View My Bookings ----------
 app.get('/my-bookings', checkAuthenticated, checkCustomer, (req, res) => {
-    const sql = `SELECT bookings.*, flights.flight_number, flights.origin, flights.destination,
+    const sql = `SELECT bookings.*, 
+                        COALESCE(flights.flight_number, 'Removed flight') AS flight_number,
+                        COALESCE(flights.origin, 'N/A') AS origin,
+                        COALESCE(flights.destination, 'N/A') AS destination,
                         flights.departure_date, flights.departure_time
                  FROM bookings
-                 JOIN flights ON bookings.flight_id = flights.id
+                 LEFT JOIN flights ON bookings.flight_id = flights.id
                  WHERE bookings.user_id = ?
                  ORDER BY bookings.booking_date DESC`;
     db.query(sql, [req.session.user.id], (err, bookings) => {
@@ -281,7 +284,14 @@ app.get('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
             req.flash('error', 'Booking not found.');
             return res.redirect('/my-bookings');
         }
-        res.render('edit-booking', { booking: results[0] });
+
+        const booking = results[0];
+        if (booking.status !== 'confirmed') {
+            req.flash('error', 'This booking cannot be edited.');
+            return res.redirect('/my-bookings');
+        }
+
+        res.render('edit-booking', { booking });
     });
 });
 
@@ -301,6 +311,11 @@ app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => 
         }
 
         const booking = results[0];
+        if (booking.status !== 'confirmed') {
+            req.flash('error', 'This booking cannot be edited.');
+            return res.redirect('/my-bookings');
+        }
+
         const seatDelta = newCount - booking.passenger_count; // +ve = needs more seats
 
         // Enhancement: check flight still has enough available seats before applying the change
@@ -341,12 +356,18 @@ app.post('/bookings/delete/:id', checkAuthenticated, checkCustomer, (req, res) =
         }
 
         const booking = results[0];
+        if (booking.status === 'cancelled') {
+            req.flash('error', 'Booking is already cancelled.');
+            return res.redirect('/my-bookings');
+        }
+        if (booking.status === 'flight removed') {
+            req.flash('error', 'This booking can no longer be cancelled because the flight was removed.');
+            return res.redirect('/my-bookings');
+        }
 
-        const deleteSql = 'DELETE FROM bookings WHERE id = ?';
-        db.query(deleteSql, [bookingId], (err) => {
+        db.query('UPDATE bookings SET status = ? WHERE id = ?', ['cancelled', bookingId], (err) => {
             if (err) throw err;
 
-            // Enhancement: restore the seats back to the flight's available inventory
             const restoreSeatsSql = 'UPDATE flights SET available_seats = available_seats + ? WHERE id = ?';
             db.query(restoreSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
                 if (err) throw err;
@@ -465,21 +486,38 @@ app.post('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) =
 
 // ---------- STUDENT E: Admin Delete Flight ----------
 app.post('/admin/flights/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
-    const sql = 'DELETE FROM flights WHERE id = ?';
-    db.query(sql, [req.params.id], (err) => {
+    const flightId = req.params.id;
+
+    db.query('SELECT id, status FROM bookings WHERE flight_id = ?', [flightId], (err, bookings) => {
         if (err) throw err;
-        req.flash('success', 'Flight deleted successfully!');
-        res.redirect('/admin');
+
+        const updateStatusSql = 'UPDATE bookings SET status = ? WHERE id = ?';
+        const updateQueue = bookings.filter(b => b.status === 'confirmed').map(b => new Promise((resolve, reject) => {
+            db.query(updateStatusSql, ['flight removed', b.id], (err) => err ? reject(err) : resolve());
+        }));
+
+        Promise.all(updateQueue).then(() => {
+            db.query('DELETE FROM flights WHERE id = ?', [flightId], (err) => {
+                if (err) throw err;
+                req.flash('success', 'Flight deleted successfully!');
+                res.redirect('/admin');
+            });
+        }).catch((err) => {
+            throw err;
+        });
     });
 });
 
 // ---------- STUDENT C: Admin View All Bookings ----------
 app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
-    const sql = `SELECT bookings.*, users.username, users.email, flights.flight_number,
-                        flights.origin, flights.destination, flights.departure_date
+    const sql = `SELECT bookings.*, users.username, users.email,
+                        COALESCE(flights.flight_number, 'Removed flight') AS flight_number,
+                        COALESCE(flights.origin, 'N/A') AS origin,
+                        COALESCE(flights.destination, 'N/A') AS destination,
+                        flights.departure_date
                  FROM bookings
                  JOIN users ON bookings.user_id = users.id
-                 JOIN flights ON bookings.flight_id = flights.id
+                 LEFT JOIN flights ON bookings.flight_id = flights.id
                  ORDER BY bookings.booking_date DESC`;
     db.query(sql, (err, bookings) => {
         if (err) throw err;
@@ -490,8 +528,6 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
 app.post('/admin/bookings/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
     const bookingId = req.params.id;
 
-    // No user_id check here - admin can cancel any booking, unlike
-    // the passenger-facing /bookings/delete/:id route.
     db.query('SELECT * FROM bookings WHERE id = ?', [bookingId], (err, results) => {
         if (err) throw err;
         if (results.length === 0) return res.status(404).send('Booking not found');
@@ -499,6 +535,10 @@ app.post('/admin/bookings/delete/:id', checkAuthenticated, checkAdmin, (req, res
         const booking = results[0];
         if (booking.status === 'cancelled') {
             req.flash('error', 'Booking is already cancelled.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.status === 'flight removed') {
+            req.flash('error', 'This booking is already marked as flight removed.');
             return res.redirect('/admin/bookings');
         }
 
