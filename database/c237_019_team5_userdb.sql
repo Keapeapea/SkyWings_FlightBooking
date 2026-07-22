@@ -1,8 +1,8 @@
 -- SkyWings Flight Booking Application
 -- Database schema
 
-CREATE DATABASE IF NOT EXISTS skywings_db;
-USE skywings_db;
+CREATE DATABASE IF NOT EXISTS c237_019_team4_CA2;
+USE c237_019_team4_CA2;
 
 DROP TABLE IF EXISTS bookings;
 DROP TABLE IF EXISTS flights;

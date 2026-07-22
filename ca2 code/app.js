@@ -10,7 +10,7 @@ const db = mysql.createConnection({
     host: 'c237-adib-mysql.mysql.database.azure.com',
     user: 'c237_019',
     password: 'c237019@2026!',
-    database: 'c237_019_team5_userdb',
+    database: 'c237_019_team4_CA2',
     ssl: {
         rejectUnauthorized: false
     }
@@ -20,14 +20,14 @@ db.connect((err) => {
     if (err) {
         throw err;
     }
-    console.log('Connected to c237_019_team5_userdb');
+    console.log('Connected to c237_019_team4_CA2 database.');
 });
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static('public'));
 
 app.use(session({
-    secret: 'c237_019_team5_secret_key',
+    secret: 'c237_019_team4_secret_key',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
