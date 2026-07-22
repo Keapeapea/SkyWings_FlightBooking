@@ -10,6 +10,8 @@
     <div class="container">
         <%- include('partials/flash') %>
 
+        <a href="/admin" style="display:inline-block; margin-bottom:16px; font-weight:600;">&larr; Back to flights</a>
+
         <div class="card">
             <h2>Add New Flight</h2>
             <form action="/admin/flights/add" method="POST">
@@ -43,7 +45,7 @@
                 </div>
                 <div class="field">
                     <label for="price">Price (economy, $)</label>
-                    <input type="number" id="price" name="price" step="0.01" min="0" required>
+                    <input type="number" id="price" name="price" step="0.01" min="50" required>
                 </div>
                 <div class="field">
                     <label for="total_seats">Total Seats</label>
@@ -53,5 +55,19 @@
             </form>
         </div>
     </div>
+
+    <script>
+        document.getElementById('departure_date').min = new Date().toISOString().split('T')[0];
+
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const dep = document.getElementById('departure_time').value;
+            const arr = document.getElementById('arrival_time').value;
+            if (arr <= dep) {
+                alert('Arrival time must be after departure time.');
+                e.preventDefault();
+            }
+        });
+    </script>
+
 </body>
 </html>

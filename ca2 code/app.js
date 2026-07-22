@@ -404,10 +404,21 @@ app.post('/admin/flights/add', checkAuthenticated, checkAdmin, (req, res) => {
         return res.redirect('/admin/flights/add');
     }
 
+    if (parseFloat(price) < 50 || parseInt(total_seats) < 1) {
+        req.flash('error', 'Price must be at least $50 and seats at least 1.');
+        return res.redirect('/admin/flights/add');
+    }
+
     const sql = `INSERT INTO flights (flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, available_seats)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     db.query(sql, [flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, total_seats], (err) => {
-        if (err) throw err;
+        if (err) {
+            if (err.code === 'ER_DUP_ENTRY') {
+                req.flash('error', 'That flight number already exists.');
+                return res.redirect('/admin/flights/add');
+            }
+            throw err;
+        }
         req.flash('success', 'Flight added successfully!');
         res.redirect('/admin');
     });
