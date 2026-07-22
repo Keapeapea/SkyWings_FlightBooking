@@ -25,9 +25,7 @@ db.connect((err) => {
         throw err;
     }
     console.log('Connected to c237_019_team4_CA2 database.');
- 
-    // One-time migration: make sure the cancelled_by tracking column exists.
-    // Safe to run on every boot - if it's already there, we just log and move on.
+
     db.query('ALTER TABLE bookings ADD COLUMN cancelled_by VARCHAR(20) NULL', (err) => {
         if (err) {
             if (err.code === 'ER_DUP_FIELDNAME') {
@@ -37,6 +35,14 @@ db.connect((err) => {
             }
         } else {
             console.log('cancelled_by column added.');
+        }
+    });
+
+    db.query("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'confirmed'", (err) => {
+        if (err) {
+            console.error('Could not widen bookings.status column:', err.message);
+        } else {
+            console.log('bookings.status column is ready.');
         }
     });
 });
@@ -648,4 +654,4 @@ app.post('/admin/bookings/reactivate/:id', checkAuthenticated, checkAdmin, (req,
  
 app.listen(3000, () => {
     console.log('SkyWings server started on http://localhost:3000');
-});
+}); 
