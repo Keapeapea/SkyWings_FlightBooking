@@ -10,31 +10,67 @@
     <div class="container">
         <%- include('partials/flash') %>
 
-        <div class="card">
-            <h2>Book Flight <%= flight.flight_number %></h2>
-            <p class="meta"><%= flight.origin %> → <%= flight.destination %> on <%= new Date(flight.departure_date).toDateString() %></p>
-            <p class="meta">Base price: $<%= Number(flight.price).toFixed(2) %> per passenger (economy)</p>
-            <p class="meta">Seats available: <strong><%= flight.available_seats %></strong></p>
+        <div class="card boarding-card">
+            <div class="boarding-top">
+                <div class="bp-date"><%= new Date(flight.departure_date).toDateString() %></div>
+                <div class="bp-route">
+                    <div class="bp-airport">
+                        <div class="code"><%= flight.origin %></div>
+                    </div>
+                    <div class="bp-route-line">
+                        <span class="bp-dot"></span>
+                        <span class="line"></span>
+                        <span class="plane">✈</span>
+                        <span class="line"></span>
+                        <span class="bp-dot"></span>
+                    </div>
+                    <div class="bp-airport right">
+                        <div class="code"><%= flight.destination %></div>
+                    </div>
+                </div>
+            </div>
+            <div class="boarding-meta-row">
+                <div class="item">
+                    <div class="label">Flight</div>
+                    <div class="value"><%= flight.flight_number %></div>
+                </div>
+                <div class="item">
+                    <div class="label">Departs</div>
+                    <div class="value"><%= flight.departure_time %></div>
+                </div>
+                <div class="item">
+                    <div class="label">Price / pax</div>
+                    <div class="value">$<%= Number(flight.price).toFixed(2) %></div>
+                </div>
+                <div class="item">
+                    <div class="label">Seats Left</div>
+                    <div class="value"><%= flight.available_seats %></div>
+                </div>
+            </div>
 
-            <form action="/book/<%= flight.id %>" method="POST">
-                <div class="field">
-                    <label for="passenger_name">Passenger Full Name</label>
-                    <input type="text" id="passenger_name" name="passenger_name" required>
-                </div>
-                <div class="field">
-                    <label for="passenger_count">Number of Passengers</label>
-                    <input type="number" id="passenger_count" name="passenger_count" min="1" max="<%= flight.available_seats %>" value="1" required>
-                </div>
-                <div class="field">
-                    <label for="seat_class">Seat Class</label>
-                    <select id="seat_class" name="seat_class">
-                        <option value="economy">Economy (x1 price)</option>
-                        <option value="business">Business (x2 price)</option>
-                        <option value="first">First Class (x3 price)</option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-accent">Confirm Booking</button>
-            </form>
+            <div class="boarding-bottom">
+                <h2 style="margin-top:0;">Passenger Details</h2>
+                <form action="/book/<%= flight.id %>" method="POST">
+                    <div class="field">
+                        <label for="passenger_name">Passenger Full Name</label>
+                        <input type="text" id="passenger_name" name="passenger_name" required>
+                    </div>
+                    <div class="field">
+                        <label for="passenger_count">Number of Passengers</label>
+                        <input type="number" id="passenger_count" name="passenger_count" min="1" max="<%= flight.available_seats %>" value="1" required>
+                    </div>
+                    <div class="field">
+                        <label for="seat_class">Seat Class</label>
+                        <select id="seat_class" name="seat_class">
+                            <option value="economy">Economy (x1 price)</option>
+                            <option value="business">Business (x2 price)</option>
+                            <option value="first">First Class (x3 price)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-accent">Confirm Booking</button>
+                </form>
+            </div>
+            <div class="barcode"></div>
         </div>
     </div>
 </body>

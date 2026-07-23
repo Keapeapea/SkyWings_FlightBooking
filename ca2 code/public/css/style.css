@@ -1,51 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-    --primary: #0a5c9c;
-    --primary-dark: #073f6b;
-    --accent: #f5a623;
-    --bg: #f4f7fa;
+    --primary: #16345c;
+    --primary-dark: #0c2036;
+    --teal: #4f9d98;
+    --teal-dark: #3c827e;
+    --teal-pale: #e9f5f4;
+    --accent: #f0b429;
+    --bg: #eef2f6;
     --card: #ffffff;
-    --text: #1f2d3d;
-    --muted: #6b7a8d;
+    --text: #16233a;
+    --muted: #7c8aa0;
     --danger: #d64545;
+    --danger-pale: #fdeaea;
     --success: #2e9e5b;
-    --border: #e1e8ef;
+    --success-pale: #e3f6ea;
+    --border: #e2e8f0;
+    --radius: 18px;
 }
 
 * { box-sizing: border-box; }
 
 body {
     margin: 0;
-    font-family: 'Segoe UI', Arial, sans-serif;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
 }
 
+h1, h2, h3 { font-family: 'Poppins', 'Segoe UI', Arial, sans-serif; color: var(--primary-dark); }
+
+/* ---------- Nav ---------- */
 nav {
     background: var(--primary-dark);
     color: #fff;
-    padding: 14px 32px;
+    padding: 16px 32px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
+    position: relative;
+    z-index: 5;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 
 nav .brand {
+    font-family: 'Poppins', sans-serif;
     font-size: 1.3rem;
     font-weight: 700;
     color: #fff;
     text-decoration: none;
+    letter-spacing: 0.2px;
 }
+
+nav .links { display: flex; align-items: center; flex-wrap: wrap; }
 
 nav .links a {
-    color: #dce8f5;
+    color: #cfe0ee;
     text-decoration: none;
     margin-left: 20px;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+    transition: color 0.15s;
 }
 
-nav .links a:hover { color: var(--accent); }
+nav .links a:hover { color: var(--teal); }
+nav .links a:not(:last-child):not([style]) { }
 
+/* ---------- Layout ---------- */
 .container {
     max-width: 1100px;
     margin: 30px auto;
@@ -54,104 +76,282 @@ nav .links a:hover { color: var(--accent); }
 
 .card {
     background: var(--card);
-    border-radius: 10px;
-    padding: 24px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    border-radius: var(--radius);
+    padding: 26px;
+    box-shadow: 0 4px 18px rgba(16,44,74,0.07);
     margin-bottom: 20px;
+    border: 1px solid var(--border);
 }
 
-h1, h2, h3 { color: var(--primary-dark); }
-
+/* ---------- Hero (dotted world-map header, like the app screens) ---------- */
 .hero {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle, rgba(255,255,255,0.16) 1.4px, transparent 1.4px),
+        linear-gradient(135deg, var(--primary), var(--primary-dark));
+    background-size: 16px 16px, 100% 100%;
     color: #fff;
-    padding: 60px 20px;
+    padding: 70px 20px 60px;
     text-align: center;
-    border-radius: 0 0 20px 20px;
+    border-radius: 0 0 28px 28px;
 }
 
-.hero h1 { color: #fff; font-size: 2.3rem; margin-bottom: 10px; }
-.hero p { font-size: 1.1rem; opacity: 0.9; }
+.hero::after {
+    content: "✈";
+    position: absolute;
+    top: 18px;
+    right: 6%;
+    font-size: 5.5rem;
+    color: #fff;
+    opacity: 0.12;
+    transform: rotate(25deg);
+    pointer-events: none;
+}
 
+.hero h1 {
+    color: #fff;
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+    position: relative;
+}
+.hero p { font-size: 1.05rem; opacity: 0.85; position: relative; }
+
+/* ---------- Buttons (rounded, pill-style like the app) ---------- */
 .btn {
     display: inline-block;
-    padding: 10px 20px;
-    border-radius: 6px;
+    padding: 11px 24px;
+    border-radius: 30px;
     border: none;
-    background: var(--primary);
+    background: var(--teal);
     color: #fff;
     cursor: pointer;
     text-decoration: none;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 600;
-    transition: background 0.15s;
+    transition: background 0.15s, transform 0.1s;
+    letter-spacing: 0.1px;
 }
 
-.btn:hover { background: var(--primary-dark); }
-.btn-accent { background: var(--accent); color: #3a2a00; }
-.btn-accent:hover { background: #d98e12; }
+.btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-accent { background: var(--primary-dark); color: #fff; }
+.btn-accent:hover { background: #08182c; }
 .btn-danger { background: var(--danger); }
 .btn-danger:hover { background: #b53838; }
-.btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+.btn-sm { padding: 7px 16px; font-size: 0.82rem; }
 
+/* ---------- Forms ---------- */
 form { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
 
 form.inline { flex-direction: row; align-items: end; flex-wrap: wrap; max-width: none; gap: 12px; }
 
-label { font-weight: 600; font-size: 0.9rem; color: var(--muted); }
+label { font-weight: 600; font-size: 0.85rem; color: var(--muted); }
 
 input, select {
-    padding: 10px 12px;
+    padding: 11px 14px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    background: #f7f9fc;
+    border-radius: 12px;
     font-size: 0.95rem;
+    font-family: inherit;
+    color: var(--text);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--teal);
+    background: #fff;
 }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 
+/* ---------- Flash messages ---------- */
 .flash {
     padding: 12px 16px;
-    border-radius: 6px;
+    border-radius: 12px;
     margin-bottom: 16px;
     font-size: 0.9rem;
+    font-weight: 500;
 }
 
-.flash.success { background: #e3f6ea; color: var(--success); border: 1px solid #b7e6c6; }
-.flash.error { background: #fdeaea; color: var(--danger); border: 1px solid #f3bcbc; }
+.flash.success { background: var(--success-pale); color: var(--success); border: 1px solid #b7e6c6; }
+.flash.error { background: var(--danger-pale); color: var(--danger); border: 1px solid #f3bcbc; }
 
+/* ---------- Tables ---------- */
 table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-th { color: var(--muted); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+th, td { text-align: left; padding: 13px 12px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+th { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; font-weight: 700; }
+tbody tr:hover { background: #f7fafc; }
 
 .badge {
     display: inline-block;
-    padding: 3px 10px;
+    padding: 4px 12px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
 }
-.badge.confirmed { background: #e3f6ea; color: var(--success); }
-.badge.cancelled { background: #fdeaea; color: var(--danger); }
+.badge.confirmed { background: var(--success-pale); color: var(--success); }
+.badge.cancelled { background: var(--danger-pale); color: var(--danger); }
 .badge.seats-low { background: #fff2e0; color: #b56b00; }
-.badge.seats-ok { background: #e3f6ea; color: var(--success); }
+.badge.seats-ok { background: var(--teal-pale); color: var(--teal-dark); }
 
+/* ---------- Flight cards (styled after the "Select Flight" screen) ---------- */
 .flight-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 18px;
     margin-top: 20px;
 }
 
 .flight-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px;
+    background: var(--teal-pale);
+    border: 1px solid #d7ebe9;
+    border-radius: var(--radius);
+    padding: 20px;
+    transition: transform 0.15s, box-shadow 0.15s;
 }
 
-.flight-card .route { font-size: 1.1rem; font-weight: 700; color: var(--primary-dark); }
+.flight-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(16,44,74,0.09); }
+
+.flight-card .route-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.flight-card .airport { min-width: 0; }
+.flight-card .airport.right { text-align: right; }
+.flight-card .airport .code {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+}
+
+.flight-card .route-line {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--teal-dark);
+    padding: 0 6px;
+}
+.flight-card .route-line .line {
+    flex: 1;
+    height: 0;
+    border-top: 2px dashed #a9cfcb;
+}
+.flight-card .route-line .plane { font-size: 1rem; transform: rotate(90deg); }
+.flight-card .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal-dark); flex-shrink: 0; }
+
+.flight-card .meta-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    font-size: 0.8rem;
+}
+.flight-card .meta-row .label { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.flight-card .meta-row .value { color: var(--text); font-weight: 600; margin-top: 2px; }
+.flight-card .meta-row .center { text-align: center; color: var(--teal-dark); font-weight: 600; }
+
+.flight-card .bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed #c7e2df;
+}
+
+.flight-card .airline { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.flight-card .price { font-size: 1.25rem; font-weight: 800; color: var(--primary-dark); font-family: 'Poppins', sans-serif; }
+.flight-card .price .per { font-size: 0.68rem; font-weight: 500; color: var(--muted); margin-left: 4px; }
+
+.flight-card .seats-row { margin-top: 10px; }
+.flight-card .btn { display: block; text-align: center; margin-top: 14px; }
+
+/* legacy support (kept in case referenced elsewhere) */
 .flight-card .meta { color: var(--muted); font-size: 0.85rem; margin: 6px 0; }
-.flight-card .price { font-size: 1.3rem; font-weight: 700; color: var(--accent); margin: 10px 0; }
+
+/* ---------- Boarding-pass style booking card ---------- */
+.boarding-card { padding: 0; overflow: hidden; }
+
+.boarding-top {
+    background: var(--teal-pale);
+    padding: 24px 26px 20px;
+    position: relative;
+}
+.boarding-top::before,
+.boarding-top::after {
+    content: "";
+    position: absolute;
+    bottom: -12px;
+    width: 24px;
+    height: 24px;
+    background: var(--bg);
+    border-radius: 50%;
+}
+.boarding-top::before { left: -12px; }
+.boarding-top::after { right: -12px; }
+
+.bp-date { color: var(--teal-dark); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.bp-route {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+}
+.bp-airport .code { font-family: 'Poppins', sans-serif; font-size: 1.6rem; font-weight: 800; color: var(--primary-dark); }
+.bp-airport .city { color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+.bp-airport.right { text-align: right; }
+
+.bp-route-line {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    color: var(--teal-dark);
+}
+.bp-route-line .line { flex: 1; height: 0; border-top: 2px dashed #a9cfcb; }
+.bp-route-line .plane { font-size: 1.1rem; transform: rotate(90deg); }
+.bp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal-dark); flex-shrink: 0; }
+
+.bp-divider {
+    border: none;
+    border-top: 2px dashed #cfd9e3;
+    margin: 22px 0 0;
+    position: relative;
+}
+
+.boarding-meta-row {
+    display: flex;
+    gap: 28px;
+    padding: 18px 26px;
+    background: var(--primary-dark);
+    color: #fff;
+    flex-wrap: wrap;
+}
+.boarding-meta-row .item .label { color: #9fb2c8; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.boarding-meta-row .item .value { font-weight: 700; font-size: 1rem; margin-top: 4px; font-family: 'Poppins', sans-serif; }
+
+.boarding-bottom { padding: 26px; }
+.boarding-bottom form { max-width: none; }
+
+.barcode {
+    height: 40px;
+    margin: 0 26px 22px;
+    background: repeating-linear-gradient(90deg, var(--primary-dark) 0px, var(--primary-dark) 2px, transparent 2px, transparent 5px, var(--primary-dark) 5px, var(--primary-dark) 6px, transparent 6px, transparent 10px);
+    opacity: 0.85;
+    border-radius: 4px;
+}
 
 .actions { display: flex; gap: 8px; margin-top: 10px; }
 

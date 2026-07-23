@@ -7,33 +7,41 @@ const app = express();
 
 // ---------- Database connection ----------
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'YOUR_MYSQL_PASSWORD',
-    database: 'skywings_db',
-    dateStrings: true // return DATE/TIME columns as plain strings (avoids timezone shifting issues)
+    host: 'c237-adib-mysql.mysql.database.azure.com',
+    user: 'c237_019',
+    password: 'c237019@2026!',
+    database: 'c237_019_team4_CA2',
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
-
+ 
 db.connect((err) => {
     if (err) {
         throw err;
     }
-    console.log('Connected to skywings_db');
+    console.log('Connected to c237_019_team4_CA2 database.');
+
+    db.query('ALTER TABLE bookings ADD COLUMN cancelled_by VARCHAR(20) NULL', (err) => {
+        if (err) {
+            if (err.code === 'ER_DUP_FIELDNAME') {
+                console.log('cancelled_by column already exists - skipping.');
+            } else {
+                console.error('Could not ensure booking cancellation tracking column:', err.message);
+            }
+        } else {
+            console.log('cancelled_by column added.');
+        }
+    });
+
+    db.query("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'confirmed'", (err) => {
+        if (err) {
+            console.error('Could not widen bookings.status column:', err.message);
+        } else {
+            console.log('bookings.status column is ready.');
+        }
+    });
 });
-
-app.use(express.urlencoded({ extended: false }));
-app.use(express.static('public'));
-
-app.use(session({
-    secret: 'skywings_secret_key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
-}));
-
-app.use(flash());
-
-app.set('view engine', 'ejs');
 
 // make flash messages and logged-in user available to every view automatically
 app.use((req, res, next) => {
@@ -91,6 +99,26 @@ const validateRegistration = (req, res, next) => {
 // =====================================================
 app.get('/', (req, res) => {
     res.render('index');
+});
+
+// Contact Page
+app.get('/contact-us', (req, res) => {
+    res.render('contact-us');
+});
+
+app.post('/contact', (req, res) => {
+    const { name, email, message } = req.body;
+
+    console.log(name, email, message);
+
+    res.redirect('/contact-us');
+});
+
+// Profile Page
+app.get('/profile', checkAuthenticated, (req, res) => {
+    res.render('profile', {
+        user: req.session.user
+    });
 });
 
 // ---------- STUDENT A: Registration ----------
