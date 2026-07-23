@@ -33,21 +33,26 @@
                     </thead>
                     <tbody>
                         <% bookings.forEach(b => { %>
+                            <% const badgeClass = b.status === 'flight removed' ? 'flight-removed' : b.status; %>
                             <tr>
-                                <td><%= b.flight_number %></td>
-                                <td><%= b.origin %> → <%= b.destination %></td>
-                                <td><%= new Date(b.departure_date).toDateString() %> <%= b.departure_time %></td>
-                                <td><%= b.passenger_name %></td>
-                                <td><%= b.passenger_count %></td>
-                                <td><%= b.seat_class %></td>
-                                <td>$<%= Number(b.total_price).toFixed(2) %></td>
-                                <td><span class="badge <%= b.status %>"><%= b.status %></span></td>
-                                <td>
+                                <td data-label="Flight"><%= b.flight_number %></td>
+                                <td data-label="Route"><%= b.origin %> → <%= b.destination %></td>
+                                <td data-label="Departure"><%= b.departure_date ? new Date(b.departure_date).toDateString() : 'N/A' %> <%= b.departure_time %></td>
+                                <td data-label="Passenger"><%= b.passenger_name %></td>
+                                <td data-label="Pax"><%= b.passenger_count %></td>
+                                <td data-label="Class"><%= b.seat_class %></td>
+                                <td data-label="Total">$<%= Number(b.total_price).toFixed(2) %></td>
+                                <td data-label="Status"><span class="badge <%= badgeClass %>"><%= b.status %></span></td>
+                                <td data-label="Actions">
                                     <div class="actions">
-                                        <a class="btn btn-sm" href="/bookings/edit/<%= b.id %>">Edit</a>
-                                        <form action="/bookings/delete/<%= b.id %>" method="POST" onsubmit="return confirm('Cancel this booking?');">
-                                            <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
-                                        </form>
+                                        <% if (b.status === 'confirmed') { %>
+                                            <a class="btn btn-sm" href="/bookings/edit/<%= b.id %>">Edit</a>
+                                            <form action="/bookings/delete/<%= b.id %>" method="POST" onsubmit="return confirm('Cancel this booking?');">
+                                                <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                            </form>
+                                        <% } else { %>
+                                            <span class="muted-text">Unavailable</span>
+                                        <% } %>
                                     </div>
                                 </td>
                             </tr>

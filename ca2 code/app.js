@@ -2,8 +2,9 @@ const express = require('express');
 const mysql = require('mysql2');
 const session = require('express-session');
 const flash = require('connect-flash');
-
+ 
 const app = express();
+
 
 // ---------- Database connection ----------
 const db = mysql.createConnection({
@@ -20,28 +21,22 @@ db.connect((err) => {
     if (err) {
         throw err;
     }
-    console.log('Connected to c237_019_team4_CA2 database.');
-
-    db.query('ALTER TABLE bookings ADD COLUMN cancelled_by VARCHAR(20) NULL', (err) => {
-        if (err) {
-            if (err.code === 'ER_DUP_FIELDNAME') {
-                console.log('cancelled_by column already exists - skipping.');
-            } else {
-                console.error('Could not ensure booking cancellation tracking column:', err.message);
-            }
-        } else {
-            console.log('cancelled_by column added.');
-        }
-    });
-
-    db.query("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'confirmed'", (err) => {
-        if (err) {
-            console.error('Could not widen bookings.status column:', err.message);
-        } else {
-            console.log('bookings.status column is ready.');
-        }
-    });
+    console.log('Connected to skywings_db');
 });
+
+app.use(express.urlencoded({ extended: false }));
+app.use(express.static('public'));
+
+app.use(session({
+    secret: 'skywings_secret_key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
+}));
+
+app.use(flash());
+
+app.set('view engine', 'ejs');
 
 // make flash messages and logged-in user available to every view automatically
 app.use((req, res, next) => {
@@ -50,10 +45,31 @@ app.use((req, res, next) => {
     res.locals.user = req.session.user || null;
     next();
 });
+ 
+// Seat-class price multiplier - the core of the booking price enhancement.
+// economy = base price, business = 2x, first = 3x.
+const CLASS_MULTIPLIER = { economy: 1, business: 2, first: 3 };
+function getMultiplier(seatClass) {
+    return CLASS_MULTIPLIER[seatClass] || 1;
+}
 
-// =====================================================
-// STUDENT A - Access Control Middleware
-// =====================================================
+// Maps the `fare` radio value from book.ejs to a seat class + per-person
+// price multiplier. Keep these numbers in sync with the prices shown on
+// the fare cards in book.ejs.
+const FARE_INFO = {
+    economy_basic:      { seatClass: 'economy',  multiplier: 1 },
+    economy_standard:   { seatClass: 'economy',  multiplier: 1.15 },
+    business_lite:      { seatClass: 'business', multiplier: 2 },
+    business_standard:  { seatClass: 'business', multiplier: 2.5 }
+};
+function getFareInfo(fare) {
+    return FARE_INFO[fare] || { seatClass: 'economy', multiplier: 1 };
+}
+ 
+// ============================================================
+// Student A - Access control middleware
+// ============================================================
+ 
 const checkAuthenticated = (req, res, next) => {
     if (req.session.user) {
         return next();
@@ -61,7 +77,7 @@ const checkAuthenticated = (req, res, next) => {
     req.flash('error', 'Please log in to view this resource.');
     res.redirect('/login');
 };
-
+ 
 const checkAdmin = (req, res, next) => {
     if (req.session.user && req.session.user.role === 'admin') {
         return next();
@@ -69,7 +85,7 @@ const checkAdmin = (req, res, next) => {
     req.flash('error', 'Access denied. Admins only.');
     res.redirect('/dashboard');
 };
-
+ 
 const checkCustomer = (req, res, next) => {
     if (req.session.user && req.session.user.role === 'customer') {
         return next();
@@ -77,60 +93,42 @@ const checkCustomer = (req, res, next) => {
     req.flash('error', 'Access denied. Customers only.');
     res.redirect('/admin');
 };
-
+ 
 const validateRegistration = (req, res, next) => {
     const { username, email, password, address, contact } = req.body;
-
+ 
     if (!username || !email || !password || !address || !contact) {
         req.flash('error', 'All fields are required.');
         return res.redirect('/register');
     }
-
+ 
     if (password.length < 6) {
         req.flash('error', 'Password must be at least 6 characters long.');
         return res.redirect('/register');
     }
-
+ 
     next();
 };
-
-// =====================================================
-// PUBLIC ROUTES
-// =====================================================
+ 
+// ============================================================
+// Public routes
+// ============================================================
+ 
 app.get('/', (req, res) => {
     res.render('index');
-});
-
-// Contact Page
-app.get('/contact-us', (req, res) => {
-    res.render('contact-us');
-});
-
-app.post('/contact', (req, res) => {
-    const { name, email, message } = req.body;
-
-    console.log(name, email, message);
-
-    res.redirect('/contact-us');
-});
-
-// Profile Page
-app.get('/profile', checkAuthenticated, (req, res) => {
-    res.render('profile', {
-        user: req.session.user
-    });
 });
 
 // ---------- STUDENT A: Registration ----------
 app.get('/register', (req, res) => {
     res.render('register');
 });
-
+ 
 app.post('/register', validateRegistration, (req, res) => {
     const { username, email, password, address, contact } = req.body;
-    // public registration is always for customers; admin accounts are seeded directly in the DB
+    // Public registration is always for customers - admin accounts are
+    // seeded directly in the database, not self-registered.
     const role = 'customer';
-
+ 
     const checkSql = 'SELECT id FROM users WHERE email = ?';
     db.query(checkSql, [email], (err, results) => {
         if (err) throw err;
@@ -138,63 +136,63 @@ app.post('/register', validateRegistration, (req, res) => {
             req.flash('error', 'An account with that email already exists.');
             return res.redirect('/register');
         }
-
+ 
         const sql = 'INSERT INTO users (username, email, password, address, contact, role) VALUES (?, ?, SHA1(?), ?, ?, ?)';
-        db.query(sql, [username, email, password, address, contact, role], (err, result) => {
+        db.query(sql, [username, email, password, address, contact, role], (err) => {
             if (err) throw err;
             req.flash('success', 'Registration successful! Please log in.');
             res.redirect('/login');
         });
     });
 });
-
-// ---------- STUDENT A: Login / Logout ----------
+ 
+// ---------- Student A: Login / Logout ----------
+ 
 app.get('/login', (req, res) => {
     res.render('login');
 });
-
+ 
 app.post('/login', (req, res) => {
     const { email, password } = req.body;
-
+ 
     if (!email || !password) {
         req.flash('error', 'All fields are required.');
         return res.redirect('/login');
     }
-
+ 
     const sql = 'SELECT * FROM users WHERE email = ? AND password = SHA1(?)';
     db.query(sql, [email, password], (err, results) => {
         if (err) throw err;
-
-        if (results.length > 0) {
-            req.session.user = results[0];
-            req.flash('success', 'Login successful!');
-            if (results[0].role === 'admin') {
-                return res.redirect('/admin');
-            }
-            return res.redirect('/dashboard');
+ 
+        if (results.length === 0) {
+            req.flash('error', 'Invalid email or password.');
+            return res.redirect('/login');
         }
-        req.flash('error', 'Invalid email or password.');
-        res.redirect('/login');
+ 
+        req.session.user = results[0];
+        req.flash('success', 'Login successful!');
+        res.redirect(results[0].role === 'admin' ? '/admin' : '/dashboard');
     });
 });
-
+ 
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
         res.redirect('/');
     });
 });
-
-// =====================================================
-// CUSTOMER ROUTES
-// =====================================================
-
-// ---------- STUDENT C + STUDENT F: View & Search/Filter/Sort Flights ----------
+ 
+// ============================================================
+// Customer routes
+// ============================================================
+ 
+// ---------- Student C + Student F: Browse / Search / Filter / Sort flights ----------
+ 
 app.get('/dashboard', checkAuthenticated, checkCustomer, (req, res) => {
     const { destination, date, sort } = req.query;
-
+ 
     let sql = 'SELECT * FROM flights WHERE available_seats > 0';
     const params = [];
-
+ 
     if (destination) {
         sql += ' AND destination LIKE ?';
         params.push(`%${destination}%`);
@@ -203,17 +201,11 @@ app.get('/dashboard', checkAuthenticated, checkCustomer, (req, res) => {
         sql += ' AND departure_date = ?';
         params.push(date);
     }
-
-    if (sort === 'price_asc') {
-        sql += ' ORDER BY price ASC';
-    } else if (sort === 'price_desc') {
-        sql += ' ORDER BY price DESC';
-    } else if (sort === 'date_asc') {
-        sql += ' ORDER BY departure_date ASC';
-    } else {
-        sql += ' ORDER BY departure_date ASC';
-    }
-
+ 
+    if (sort === 'price_asc') sql += ' ORDER BY price ASC';
+    else if (sort === 'price_desc') sql += ' ORDER BY price DESC';
+    else sql += ' ORDER BY departure_date ASC'; // covers 'date_asc' and no sort given
+ 
     db.query(sql, params, (err, flights) => {
         if (err) throw err;
         res.render('dashboard', {
@@ -222,8 +214,9 @@ app.get('/dashboard', checkAuthenticated, checkCustomer, (req, res) => {
         });
     });
 });
-
-// ---------- STUDENT B: Create Booking (+ enhancement: seat inventory check) ----------
+ 
+// ---------- Student B: Create booking (+ seat inventory check) ----------
+ 
 app.get('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     const sql = 'SELECT * FROM flights WHERE id = ?';
     db.query(sql, [req.params.flightId], (err, results) => {
@@ -235,16 +228,43 @@ app.get('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
         res.render('book', { flight: results[0] });
     });
 });
-
+ 
 app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     const flightId = req.params.flightId;
-    const { passenger_name, passenger_count, seat_class } = req.body;
-    const passengerCount = parseInt(passenger_count, 10);
 
-    if (!passenger_name || !passengerCount || passengerCount < 1) {
+    // With extended:true, name="first_name[]" etc. parse into arrays on
+    // req.body.first_name / req.body.last_name / req.body.passenger_number.
+    // Helper: always return an array, even if a field was omitted entirely.
+    const asArray = (val) => (val === undefined ? [] : (Array.isArray(val) ? val : [val]));
+
+    const firstNames   = asArray(req.body.first_name);
+    const lastNames    = asArray(req.body.last_name);
+    const genders      = asArray(req.body.passenger_gender);
+    const emails       = asArray(req.body.passenger_email);
+    const passports    = asArray(req.body.passenger_passport);
+    const dobs         = asArray(req.body.passenger_dob);
+    // passenger_number[] is used by BOTH the main passenger field and every
+    // "+ Add" block, so this array already contains one entry per passenger.
+    const numbers      = asArray(req.body.passenger_number);
+    // passenger_name[] only exists for extra passengers added via the template.
+    const extraNames   = asArray(req.body.passenger_name);
+    const fare         = req.body.fare;
+
+    const mainOk = firstNames[0] && lastNames[0] && genders[0] && emails[0] && passports[0] && dobs[0] && numbers[0];
+    if (!mainOk || !fare) {
         req.flash('error', 'Please provide valid passenger details.');
         return res.redirect(`/book/${flightId}`);
     }
+
+    // Total passenger count = the main passenger + however many extra
+    // passenger blocks were added and actually filled in.
+    const passengerCount = 1 + extraNames.filter(n => n && n.trim()).length;
+
+    // Build one readable name string to store in the single passenger_name column.
+    const allNames = [`${firstNames[0]} ${lastNames[0]}`, ...extraNames.filter(n => n && n.trim())];
+    const passengerNames = allNames.join(', ');
+
+    const { seatClass, multiplier } = getFareInfo(fare);
 
     const flightSql = 'SELECT * FROM flights WHERE id = ?';
     db.query(flightSql, [flightId], (err, results) => {
@@ -253,24 +273,24 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
             req.flash('error', 'Flight not found.');
             return res.redirect('/dashboard');
         }
-
+ 
         const flight = results[0];
-
-        // Enhancement: seat inventory check - prevent overbooking
+ 
+        // Enhancement: seat inventory check - never trust the client, block overbooking.
         if (passengerCount > flight.available_seats) {
             req.flash('error', `Only ${flight.available_seats} seat(s) left on this flight.`);
             return res.redirect(`/book/${flightId}`);
         }
-
-        const classMultiplier = seat_class === 'business' ? 2 : seat_class === 'first' ? 3 : 1;
-        const totalPrice = flight.price * passengerCount * classMultiplier;
-
-        const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price)
-                            VALUES (?, ?, ?, ?, ?, ?)`;
-        db.query(insertSql, [req.session.user.id, flightId, passenger_name, passengerCount, seat_class, totalPrice], (err) => {
+ 
+        // Total = base price x number of passengers x fare multiplier.
+        const totalPrice = flight.price * passengerCount * multiplier;
+ 
+        const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, status)
+                            VALUES (?, ?, ?, ?, ?, ?, 'confirmed')`;
+        db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice], (err) => {
             if (err) throw err;
-
-            // Enhancement: decrement available seats after successful booking
+ 
+            // Enhancement: decrement available seats after a successful booking.
             const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
             db.query(updateSeatsSql, [passengerCount, flightId], (err) => {
                 if (err) throw err;
@@ -280,13 +300,17 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
         });
     });
 });
-
-// ---------- STUDENT C: View My Bookings ----------
+ 
+// ---------- Student C: View my bookings ----------
+ 
 app.get('/my-bookings', checkAuthenticated, checkCustomer, (req, res) => {
-    const sql = `SELECT bookings.*, flights.flight_number, flights.origin, flights.destination,
+    const sql = `SELECT bookings.*,
+                        COALESCE(flights.flight_number, 'Removed flight') AS flight_number,
+                        COALESCE(flights.origin, 'N/A') AS origin,
+                        COALESCE(flights.destination, 'N/A') AS destination,
                         flights.departure_date, flights.departure_time
                  FROM bookings
-                 JOIN flights ON bookings.flight_id = flights.id
+                 LEFT JOIN flights ON bookings.flight_id = flights.id
                  WHERE bookings.user_id = ?
                  ORDER BY bookings.booking_date DESC`;
     db.query(sql, [req.session.user.id], (err, bookings) => {
@@ -294,8 +318,9 @@ app.get('/my-bookings', checkAuthenticated, checkCustomer, (req, res) => {
         res.render('my-bookings', { bookings });
     });
 });
-
-// ---------- STUDENT D: Edit Booking (+ enhancement: seat inventory adjustment) ----------
+ 
+// ---------- Student D: Edit booking (+ seat inventory adjustment) ----------
+ 
 app.get('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
     const sql = `SELECT bookings.*, flights.flight_number, flights.origin, flights.destination,
                         flights.price, flights.available_seats
@@ -307,15 +332,27 @@ app.get('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
             req.flash('error', 'Booking not found.');
             return res.redirect('/my-bookings');
         }
-        res.render('edit-booking', { booking: results[0] });
+ 
+        const booking = results[0];
+        if (booking.status !== 'confirmed') {
+            req.flash('error', 'This booking cannot be edited.');
+            return res.redirect('/my-bookings');
+        }
+ 
+        res.render('edit-booking', { booking });
     });
 });
-
+ 
 app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
     const bookingId = req.params.id;
-    const { passenger_name, passenger_count, seat_class } = req.body;
-    const newCount = parseInt(passenger_count, 10);
-
+    const { passenger_name, seat_class } = req.body;
+    const newCount = parseInt(req.body.passenger_count, 10);
+ 
+    if (!passenger_name || !newCount || newCount < 1) {
+        req.flash('error', 'Please provide valid passenger details.');
+        return res.redirect(`/bookings/edit/${bookingId}`);
+    }
+ 
     const sql = `SELECT bookings.*, flights.id AS flight_id, flights.price, flights.available_seats
                  FROM bookings JOIN flights ON bookings.flight_id = flights.id
                  WHERE bookings.id = ? AND bookings.user_id = ?`;
@@ -325,25 +362,29 @@ app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => 
             req.flash('error', 'Booking not found.');
             return res.redirect('/my-bookings');
         }
-
+ 
         const booking = results[0];
-        const seatDelta = newCount - booking.passenger_count; // +ve = needs more seats
-
-        // Enhancement: check flight still has enough available seats before applying the change
+        if (booking.status !== 'confirmed') {
+            req.flash('error', 'This booking cannot be edited.');
+            return res.redirect('/my-bookings');
+        }
+ 
+        const seatDelta = newCount - booking.passenger_count; // positive = needs more seats
+ 
+        // Enhancement: check the flight still has enough seats before applying the change.
         if (seatDelta > 0 && seatDelta > booking.available_seats) {
             req.flash('error', 'Not enough seats available for this change.');
             return res.redirect(`/bookings/edit/${bookingId}`);
         }
-
-        const classMultiplier = seat_class === 'business' ? 2 : seat_class === 'first' ? 3 : 1;
-        const newTotalPrice = booking.price * newCount * classMultiplier;
-
+ 
+        const newTotalPrice = booking.price * newCount * getMultiplier(seat_class);
+ 
         const updateBookingSql = `UPDATE bookings SET passenger_name = ?, passenger_count = ?, seat_class = ?, total_price = ?
                                    WHERE id = ?`;
         db.query(updateBookingSql, [passenger_name, newCount, seat_class, newTotalPrice, bookingId], (err) => {
             if (err) throw err;
-
-            // Enhancement: adjust flight's available seats by the delta
+ 
+            // Enhancement: adjust the flight's available seats by the delta.
             const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
             db.query(updateSeatsSql, [seatDelta, booking.flight_id], (err) => {
                 if (err) throw err;
@@ -353,11 +394,12 @@ app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => 
         });
     });
 });
-
-// ---------- STUDENT E: Cancel/Delete Booking (+ enhancement: seat restore) ----------
+ 
+// ---------- Student E: Cancel booking (+ seat restore) ----------
+ 
 app.post('/bookings/delete/:id', checkAuthenticated, checkCustomer, (req, res) => {
     const bookingId = req.params.id;
-
+ 
     const sql = 'SELECT * FROM bookings WHERE id = ? AND user_id = ?';
     db.query(sql, [bookingId, req.session.user.id], (err, results) => {
         if (err) throw err;
@@ -365,14 +407,20 @@ app.post('/bookings/delete/:id', checkAuthenticated, checkCustomer, (req, res) =
             req.flash('error', 'Booking not found.');
             return res.redirect('/my-bookings');
         }
-
+ 
         const booking = results[0];
-
-        const deleteSql = 'DELETE FROM bookings WHERE id = ?';
-        db.query(deleteSql, [bookingId], (err) => {
+        if (booking.status === 'cancelled') {
+            req.flash('error', 'Booking is already cancelled.');
+            return res.redirect('/my-bookings');
+        }
+        if (booking.status === 'flight removed') {
+            req.flash('error', 'This booking can no longer be cancelled because the flight was removed.');
+            return res.redirect('/my-bookings');
+        }
+ 
+        db.query('UPDATE bookings SET status = ?, cancelled_by = ? WHERE id = ?', ['cancelled', 'customer', bookingId], (err) => {
             if (err) throw err;
-
-            // Enhancement: restore the seats back to the flight's available inventory
+ 
             const restoreSeatsSql = 'UPDATE flights SET available_seats = available_seats + ? WHERE id = ?';
             db.query(restoreSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
                 if (err) throw err;
@@ -382,18 +430,19 @@ app.post('/bookings/delete/:id', checkAuthenticated, checkCustomer, (req, res) =
         });
     });
 });
-
-// =====================================================
-// ADMIN ROUTES
-// =====================================================
-
-// ---------- STUDENT C + STUDENT F: Admin View / Search / Filter / Sort Flights ----------
+ 
+// ============================================================
+// Admin routes
+// ============================================================
+ 
+// ---------- Student C + Student F: Admin view / search / filter / sort flights ----------
+ 
 app.get('/admin', checkAuthenticated, checkAdmin, (req, res) => {
     const { destination, date, sort } = req.query;
-
+ 
     let sql = 'SELECT * FROM flights WHERE 1=1';
     const params = [];
-
+ 
     if (destination) {
         sql += ' AND destination LIKE ?';
         params.push(`%${destination}%`);
@@ -402,44 +451,53 @@ app.get('/admin', checkAuthenticated, checkAdmin, (req, res) => {
         sql += ' AND departure_date = ?';
         params.push(date);
     }
-
-    if (sort === 'price_asc') {
-        sql += ' ORDER BY price ASC';
-    } else if (sort === 'price_desc') {
-        sql += ' ORDER BY price DESC';
-    } else {
-        sql += ' ORDER BY departure_date ASC';
-    }
-
+ 
+    if (sort === 'price_asc') sql += ' ORDER BY price ASC';
+    else if (sort === 'price_desc') sql += ' ORDER BY price DESC';
+    else sql += ' ORDER BY departure_date ASC';
+ 
     db.query(sql, params, (err, flights) => {
         if (err) throw err;
         res.render('admin', { flights, query: { destination: destination || '', date: date || '', sort: sort || '' } });
     });
 });
-
-// ---------- STUDENT B: Admin Add Flight ----------
+ 
+// ---------- Student B: Admin add flight ----------
+ 
 app.get('/admin/flights/add', checkAuthenticated, checkAdmin, (req, res) => {
     res.render('admin-add-flight');
 });
-
+ 
 app.post('/admin/flights/add', checkAuthenticated, checkAdmin, (req, res) => {
     const { flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats } = req.body;
-
+ 
     if (!flight_number || !airline || !origin || !destination || !departure_date || !departure_time || !arrival_time || !price || !total_seats) {
         req.flash('error', 'All fields are required.');
         return res.redirect('/admin/flights/add');
     }
-
+ 
+    if (parseFloat(price) < 50 || parseInt(total_seats, 10) < 1) {
+        req.flash('error', 'Price must be at least $50 and seats at least 1.');
+        return res.redirect('/admin/flights/add');
+    }
+ 
     const sql = `INSERT INTO flights (flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, available_seats)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     db.query(sql, [flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, total_seats], (err) => {
-        if (err) throw err;
+        if (err) {
+            if (err.code === 'ER_DUP_ENTRY') {
+                req.flash('error', 'That flight number already exists.');
+                return res.redirect('/admin/flights/add');
+            }
+            throw err;
+        }
         req.flash('success', 'Flight added successfully!');
         res.redirect('/admin');
     });
 });
-
-// ---------- STUDENT D: Admin Edit Flight ----------
+ 
+// ---------- Student D: Admin edit flight ----------
+ 
 app.get('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) => {
     const sql = 'SELECT * FROM flights WHERE id = ?';
     db.query(sql, [req.params.id], (err, results) => {
@@ -451,11 +509,12 @@ app.get('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) =>
         res.render('admin-edit-flight', { flight: results[0] });
     });
 });
-
+ 
 app.post('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) => {
     const { flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats } = req.body;
-
-    // fetch current booked seats so available_seats stays consistent if total_seats changes
+ 
+    // Fetch the current booked-seat count so available_seats stays
+    // consistent if total_seats changes (see README for the reasoning).
     const currentSql = 'SELECT total_seats, available_seats FROM flights WHERE id = ?';
     db.query(currentSql, [req.params.id], (err, results) => {
         if (err) throw err;
@@ -463,11 +522,11 @@ app.post('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) =
             req.flash('error', 'Flight not found.');
             return res.redirect('/admin');
         }
-
+ 
         const current = results[0];
         const bookedSeats = current.total_seats - current.available_seats;
         const newAvailable = Math.max(total_seats - bookedSeats, 0);
-
+ 
         const sql = `UPDATE flights SET flight_number = ?, airline = ?, origin = ?, destination = ?, departure_date = ?,
                      departure_time = ?, arrival_time = ?, price = ?, total_seats = ?, available_seats = ? WHERE id = ?`;
         db.query(sql, [flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, newAvailable, req.params.id], (err) => {
@@ -477,30 +536,62 @@ app.post('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) =
         });
     });
 });
-
-// ---------- STUDENT E: Admin Delete Flight ----------
+ 
+// ---------- Student E: Admin delete flight ----------
+ 
 app.post('/admin/flights/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
-    const sql = 'DELETE FROM flights WHERE id = ?';
-    db.query(sql, [req.params.id], (err) => {
+    const flightId = req.params.id;
+ 
+    // Mark any still-confirmed bookings on this flight as removed before
+    // deleting the flight itself, so passengers can see what happened
+    // instead of the booking silently disappearing.
+    const markRemovedSql = "UPDATE bookings SET status = 'flight removed' WHERE flight_id = ? AND status = 'confirmed'";
+    db.query(markRemovedSql, [flightId], (err) => {
         if (err) throw err;
-        req.flash('success', 'Flight deleted successfully!');
-        res.redirect('/admin');
+ 
+        db.query('DELETE FROM flights WHERE id = ?', [flightId], (err) => {
+            if (err) throw err;
+            req.flash('success', 'Flight deleted successfully!');
+            res.redirect('/admin');
+        });
     });
 });
-
-// ---------- STUDENT C: Admin View All Bookings ----------
+ 
+// ---------- Student C: Admin view all bookings ----------
+ 
 app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
-    const sql = `SELECT bookings.*, users.username, users.email, flights.flight_number,
-                        flights.origin, flights.destination, flights.departure_date
+    const sql = `SELECT bookings.*, users.username, users.email,
+                        COALESCE(flights.flight_number, 'Removed flight') AS flight_number,
+                        COALESCE(flights.origin, 'N/A') AS origin,
+                        COALESCE(flights.destination, 'N/A') AS destination,
+                        flights.departure_date
                  FROM bookings
                  JOIN users ON bookings.user_id = users.id
-                 JOIN flights ON bookings.flight_id = flights.id
+                 LEFT JOIN flights ON bookings.flight_id = flights.id
                  ORDER BY bookings.booking_date DESC`;
     db.query(sql, (err, bookings) => {
         if (err) throw err;
         res.render('admin-bookings', { bookings });
     });
 });
+
+
+/* add passenger*/ 
+app.get("/book/:id", (req, res) => {
+    const id = req.params.id;
+    db.query(
+        "SELECT * FROM flights WHERE id = ?",
+        [id],
+        (err, results) => {
+            if (err) throw err;
+            res.render("book", {
+                flight: results[0]
+            });
+        }
+    );
+});
+
+
 
 // Starting the server
 app.listen(3000, () => {

@@ -8,9 +8,22 @@
   },
   "dependencies": {
     "connect-flash": "^0.1.1",
+<<<<<<< HEAD
     "ejs": "^3.1.9",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
     "mysql2": "^3.23.1"
   }
+=======
+    "ejs": "^3.1.10",
+    "express": "^4.22.2",
+    "express-session": "^1.19.0",
+    "mysql2": "^3.23.1",
+    "render": "^0.1.4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+>>>>>>> 679e96025f4aedecc45be0c5a28f6fba1bbf9a99
 }
