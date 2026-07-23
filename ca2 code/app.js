@@ -43,7 +43,6 @@ db.connect((err) => {
             console.log('bookings.status column is ready.');
         }
     });
-<<<<<<< HEAD
 
     db.query('ALTER TABLE bookings ADD COLUMN seat_numbers VARCHAR(255) NULL', (err) => {
         if (err) {
@@ -73,30 +72,23 @@ db.connect((err) => {
             console.log('seats table is ready.');
         }
     });
-=======
->>>>>>> aae0cfe573be64e40896bc1fb24dd8361e15ebc5
 });
- 
-// ============================================================
-// App-level middleware
-// ============================================================
- 
-app.use(express.urlencoded({ extended: true }));
+
+app.use(express.urlencoded({ extended: false }));
 app.use(express.static('public'));
- 
+
 app.use(session({
-    secret: 'c237_019_team4_secret_key',
+    secret: 'skywings_secret_key',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
 }));
- 
+
 app.use(flash());
- 
+
 app.set('view engine', 'ejs');
- 
-// Makes flash messages and the logged-in user available to every view
-// automatically, so individual routes don't need to pass them by hand.
+
+// make flash messages and logged-in user available to every view automatically
 app.use((req, res, next) => {
     res.locals.success = req.flash('success');
     res.locals.error = req.flash('error');
@@ -226,9 +218,8 @@ const validateRegistration = (req, res, next) => {
 app.get('/', (req, res) => {
     res.render('index');
 });
- 
-// ---------- Student A: Registration ----------
- 
+
+// ---------- STUDENT A: Registration ----------
 app.get('/register', (req, res) => {
     res.render('register');
 });
