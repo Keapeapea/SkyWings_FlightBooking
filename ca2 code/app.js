@@ -1,4 +1,3 @@
-
 const express = require('express');
 const mysql = require('mysql2');
 const session = require('express-session');
@@ -810,7 +809,121 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
     });
 });
 
+// ---------- Admin: Cancel any customer's booking (+ seat restore) ----------
+// admin-bookings.ejs posts here for the "Cancel" button - this was referenced
+// in the view but had no matching route.
 
+app.post('/admin/bookings/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
+    const bookingId = req.params.id;
+
+    const sql = 'SELECT * FROM bookings WHERE id = ?';
+    db.query(sql, [bookingId], (err, results) => {
+        if (err) throw err;
+        if (results.length === 0) {
+            req.flash('error', 'Booking not found.');
+            return res.redirect('/admin/bookings');
+        }
+
+        const booking = results[0];
+        if (booking.status === 'cancelled') {
+            req.flash('error', 'Booking is already cancelled.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.status === 'flight removed') {
+            req.flash('error', 'This booking can no longer be cancelled because the flight was removed.');
+            return res.redirect('/admin/bookings');
+        }
+
+        db.query('UPDATE bookings SET status = ?, cancelled_by = ? WHERE id = ?', ['cancelled', 'admin', bookingId], (err) => {
+            if (err) throw err;
+
+            const releaseSeatsSql = 'UPDATE seats SET booking_id = NULL WHERE booking_id = ?';
+            db.query(releaseSeatsSql, [bookingId], (err) => {
+                if (err) throw err;
+
+                const restoreSeatsSql = 'UPDATE flights SET available_seats = available_seats + ? WHERE id = ?';
+                db.query(restoreSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
+                    if (err) throw err;
+                    req.flash('success', 'Booking cancelled and seats released.');
+                    res.redirect('/admin/bookings');
+                });
+            });
+        });
+    });
+});
+
+// ---------- Admin: Reactivate a booking the admin previously cancelled ----------
+// admin-bookings.ejs posts here for the "Reactivate" button - this was referenced
+// in the view but had no matching route. Only bookings cancelled by an admin (or
+// with no cancelled_by recorded) can be reactivated here, matching the view's logic;
+// bookings a customer cancelled themselves show "No action" instead.
+
+app.post('/admin/bookings/reactivate/:id', checkAuthenticated, checkAdmin, (req, res) => {
+    const bookingId = req.params.id;
+
+    const sql = `SELECT bookings.*, flights.available_seats
+                 FROM bookings LEFT JOIN flights ON bookings.flight_id = flights.id
+                 WHERE bookings.id = ?`;
+    db.query(sql, [bookingId], (err, results) => {
+        if (err) throw err;
+        if (results.length === 0) {
+            req.flash('error', 'Booking not found.');
+            return res.redirect('/admin/bookings');
+        }
+
+        const booking = results[0];
+        if (booking.status !== 'cancelled') {
+            req.flash('error', 'Only cancelled bookings can be reactivated.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.cancelled_by !== 'admin' && booking.cancelled_by !== null && booking.cancelled_by !== '') {
+            req.flash('error', 'This booking was cancelled by the customer and cannot be reactivated here.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.available_seats === null) {
+            req.flash('error', 'This booking cannot be reactivated because the flight was removed.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.passenger_count > booking.available_seats) {
+            req.flash('error', `Only ${booking.available_seats} seat(s) left on this flight - not enough to reactivate.`);
+            return res.redirect('/admin/bookings');
+        }
+
+        const seatNumbers = (booking.seat_numbers || '').split(',').map(s => s.trim()).filter(Boolean);
+
+        // Make sure the booking's original seats haven't been claimed by someone else
+        // since it was cancelled.
+        const seatCheckSql = 'SELECT seat_number FROM seats WHERE flight_id = ? AND seat_number IN (?) AND booking_id IS NOT NULL';
+        db.query(seatCheckSql, [booking.flight_id, seatNumbers], (err, takenRows) => {
+            if (err) throw err;
+            if (seatNumbers.length > 0 && takenRows.length > 0) {
+                req.flash('error', `Seat(s) ${takenRows.map(r => r.seat_number).join(', ')} have since been taken by another booking. Cannot reactivate.`);
+                return res.redirect('/admin/bookings');
+            }
+
+            db.query('UPDATE bookings SET status = ?, cancelled_by = NULL WHERE id = ?', ['confirmed', bookingId], (err) => {
+                if (err) throw err;
+
+                const claimSeats = (cb) => {
+                    if (seatNumbers.length === 0) return cb(null);
+                    const claimSeatsSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
+                    db.query(claimSeatsSql, [bookingId, booking.flight_id, seatNumbers], cb);
+                };
+
+                claimSeats((err) => {
+                    if (err) throw err;
+
+                    const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
+                    db.query(updateSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
+                        if (err) throw err;
+                        req.flash('success', 'Booking reactivated successfully!');
+                        res.redirect('/admin/bookings');
+                    });
+                });
+            });
+        });
+    });
+});
 
 
 
@@ -818,4 +931,4 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
 // Starting the server
 app.listen(3000, () => {
     console.log('SkyWings server started on http://localhost:3000');
-}); 
+});
