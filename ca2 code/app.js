@@ -21,24 +21,49 @@ db.connect((err) => {
     if (err) {
         throw err;
     }
-    console.log('Connected to skywings_db');
+    console.log('Connected to c237_019_team4_CA2 database.');
+
+    db.query('ALTER TABLE bookings ADD COLUMN cancelled_by VARCHAR(20) NULL', (err) => {
+        if (err) {
+            if (err.code === 'ER_DUP_FIELDNAME') {
+                console.log('cancelled_by column already exists - skipping.');
+            } else {
+                console.error('Could not ensure booking cancellation tracking column:', err.message);
+            }
+        } else {
+            console.log('cancelled_by column added.');
+        }
+    });
+
+    db.query("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'confirmed'", (err) => {
+        if (err) {
+            console.error('Could not widen bookings.status column:', err.message);
+        } else {
+            console.log('bookings.status column is ready.');
+        }
+    });
 });
-
-app.use(express.urlencoded({ extended: false }));
+ 
+// ============================================================
+// App-level middleware
+// ============================================================
+ 
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
-
+ 
 app.use(session({
-    secret: 'skywings_secret_key',
+    secret: 'c237_019_team4_secret_key',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
 }));
-
+ 
 app.use(flash());
-
+ 
 app.set('view engine', 'ejs');
-
-// make flash messages and logged-in user available to every view automatically
+ 
+// Makes flash messages and the logged-in user available to every view
+// automatically, so individual routes don't need to pass them by hand.
 app.use((req, res, next) => {
     res.locals.success = req.flash('success');
     res.locals.error = req.flash('error');
@@ -117,8 +142,9 @@ const validateRegistration = (req, res, next) => {
 app.get('/', (req, res) => {
     res.render('index');
 });
-
-// ---------- STUDENT A: Registration ----------
+ 
+// ---------- Student A: Registration ----------
+ 
 app.get('/register', (req, res) => {
     res.render('register');
 });
