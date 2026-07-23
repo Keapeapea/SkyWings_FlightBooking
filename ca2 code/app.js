@@ -74,7 +74,8 @@ db.connect((err) => {
     });
 });
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(express.static('public'));
 
 app.use(session({
@@ -281,11 +282,68 @@ app.get('/logout', (req, res) => {
         res.redirect('/');
     });
 });
+
+// ---------- Contact Us (public) ----------
+
+app.get('/contact-us', (req, res) => {
+    res.render('contact-us');
+});
+
+app.post('/contact-us', (req, res) => {
+    const { name, email, message } = req.body;
+
+    if (!name || !email || !message) {
+        req.flash('error', 'Please fill in every field before sending.');
+        return res.redirect('/contact-us');
+    }
+
+    // No support-ticket table exists yet, so just acknowledge the message
+    // for now - swap this for a real INSERT/email send when that's ready.
+    console.log(`New contact message from ${name} <${email}>: ${message}`);
+    req.flash('success', 'Thanks! Your message has been sent.');
+    res.redirect('/contact-us');
+});
+
+// ---------- Profile (any logged-in user) ----------
+
+app.get('/profile', checkAuthenticated, (req, res) => {
+    res.render('profile');
+});
  
 // ============================================================
 // Customer routes
 // ============================================================
  
+// ---------- One-time backfill: generate seats for flights that predate seat maps ----------
+app.get('/admin/flights/backfill-seats', checkAuthenticated, checkAdmin, (req, res) => {
+    const sql = `SELECT f.id, f.total_seats FROM flights f
+                 LEFT JOIN seats s ON s.flight_id = f.id
+                 WHERE s.id IS NULL
+                 GROUP BY f.id`;
+    db.query(sql, (err, flights) => {
+        if (err) throw err;
+        if (flights.length === 0) {
+            req.flash('success', 'Every flight already has a seat map.');
+            return res.redirect('/admin');
+        }
+
+        let remaining = flights.length;
+        let failed = [];
+
+        flights.forEach(f => {
+            generateSeatsForFlight(f.id, f.total_seats, (err) => {
+                if (err) failed.push(f.id);
+                remaining--;
+                if (remaining === 0) {
+                    req.flash('success', `Backfilled seats for ${flights.length - failed.length} flight(s).` +
+                        (failed.length ? ` Failed: ${failed.join(', ')}` : ''));
+                    res.redirect('/admin');
+                }
+            });
+        });
+    });
+});
+
 // ---------- Student C + Student F: Browse / Search / Filter / Sort flights ----------
  
 app.get('/dashboard', checkAuthenticated, checkCustomer, (req, res) => {
@@ -753,20 +811,7 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
 });
 
 
-/* add passenger*/ 
-app.get("/book/:id", (req, res) => {
-    const id = req.params.id;
-    db.query(
-        "SELECT * FROM flights WHERE id = ?",
-        [id],
-        (err, results) => {
-            if (err) throw err;
-            res.render("book", {
-                flight: results[0]
-            });
-        }
-    );
-});
+
 
 
 

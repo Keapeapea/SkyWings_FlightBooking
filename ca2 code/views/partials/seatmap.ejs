@@ -7,8 +7,10 @@
 //                     If omitted, defaults to a fixed number via `maxSeats`.
 //   maxSeats        - fallback fixed max (used when maxSeatsInputId isn't provided)
 
-const _preSelected = typeof preSelected !== 'undefined' ? preSelected : [];
+const _preSelectedRaw = typeof preSelected !== 'undefined' ? preSelected : [];
+const _preSelected = Array.isArray(_preSelectedRaw) ? _preSelectedRaw : [_preSelectedRaw];
 const _maxSeats = typeof maxSeats !== 'undefined' ? maxSeats : 1;
+const _seatMap = (typeof seatMap !== 'undefined' && Array.isArray(seatMap)) ? seatMap : [];
 
 // Flat SGD surcharge per seat class - keep this in sync with SEAT_SURCHARGE in app.js.
 // Economy is included in the base fare; Business/First add a fixed amount per seat.
@@ -22,11 +24,29 @@ function extraFor(seatClass) {
     return SEAT_SURCHARGE[seatClass] || 0;
 }
 
+// Split a seat_number like "12A" into { row: 12, letter: "A" }. Some
+// getSeatMap() implementations already return separate `row`/`letter`
+// fields - use those if present, otherwise derive them here so this
+// component works either way.
+function splitSeatNumber(seatNumber) {
+    const match = String(seatNumber).match(/^(\d+)\s*([A-Za-z])$/);
+    if (!match) return { row: null, letter: null };
+    return { row: Number(match[1]), letter: match[2].toUpperCase() };
+}
+
 // Group seats by row number, in seat_number order (already sorted by the query).
 const rowsMap = {};
-seatMap.forEach(s => {
-    if (!rowsMap[s.row]) rowsMap[s.row] = {};
-    rowsMap[s.row][s.letter] = s;
+_seatMap.forEach(s => {
+    let row = s.row;
+    let letter = s.letter;
+    if (row === undefined || row === null || letter === undefined || letter === null) {
+        const parsed = splitSeatNumber(s.seat_number);
+        row = parsed.row;
+        letter = parsed.letter;
+    }
+    if (row === null || letter === null) return; // skip anything we can't place on the grid
+    if (!rowsMap[row]) rowsMap[row] = {};
+    rowsMap[row][letter] = s;
 });
 const rowNumbers = Object.keys(rowsMap).map(Number).sort((a, b) => a - b);
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -77,6 +97,12 @@ function classOfRow(rowNum) {
         </div>
 
         <div class="seatmap-plane-panel">
+            <% if (rowNumbers.length === 0) { %>
+            <div class="seatmap-empty-state">
+                No seats are available to display for this flight. If this looks wrong,
+                check that <code>getSeatMap()</code> is returning seat rows.
+            </div>
+            <% } else { %>
             <div class="seatmap-plane" id="seatmapPlane">
                 <div class="seatmap-col-headers">
                     <span>A</span><span>B</span><span>C</span>
@@ -123,6 +149,7 @@ function classOfRow(rowNum) {
                 </div>
                 <% }); %>
             </div>
+            <% } %>
         </div>
     </div>
 
@@ -130,6 +157,7 @@ function classOfRow(rowNum) {
         <span id="seatmapSelectedText">No seats selected yet</span>
     </div>
     <div id="seatmapHiddenInputs"></div>
+    <div id="seatmapConfig" data-preselected='<%= JSON.stringify(_preSelected) %>' data-maxseats="<%= _maxSeats %>" hidden></div>
 </div>
 
 <style>
@@ -232,6 +260,20 @@ function classOfRow(rowNum) {
 
 .seatmap-plane { display: flex; flex-direction: column; gap: 8px; min-width: 300px; }
 
+.seatmap-empty-state {
+    padding: 24px;
+    text-align: center;
+    color: var(--sm-slate-600);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.seatmap-empty-state code {
+    background: var(--sm-slate-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
 .seatmap-col-headers {
     display: grid;
     grid-template-columns: repeat(3, 40px) 34px repeat(3, 40px);
@@ -312,8 +354,9 @@ function classOfRow(rowNum) {
     const summaryText = document.getElementById('seatmapSelectedText');
     const banner = document.getElementById('seatmapBanner');
     const bannerText = document.getElementById('seatmapBannerText');
+    const config = document.getElementById('seatmapConfig');
 
-    let selectedSeats = <%- JSON.stringify(_preSelected) %>;
+    let selectedSeats = JSON.parse(config.dataset.preselected || '[]');
 
     // Pages that let the passenger count change (book.ejs) can set
     // window.getMaxSelectableSeats = () => <current count>; otherwise it's fixed.
@@ -321,7 +364,7 @@ function classOfRow(rowNum) {
         if (typeof window.getMaxSelectableSeats === 'function') {
             return window.getMaxSelectableSeats();
         }
-        return <%= _maxSeats %>;
+        return Number(config.dataset.maxseats || 1);
     }
 
     function renderHiddenInputs() {
