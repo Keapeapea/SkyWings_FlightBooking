@@ -71,6 +71,7 @@ db.connect((err) => {
             console.log('seats table is ready.');
         }
     });
+<<<<<<< HEAD
 
     // Enhancement: profile page fields (display name, gender, region).
     // Added one at a time with the same "skip if it already exists" pattern
@@ -93,28 +94,25 @@ db.connect((err) => {
             }
         });
     });
+=======
+>>>>>>> 0317d44f60a33e544c0a83a48cfde56942ce7357
 });
- 
-// ============================================================
-// App-level middleware
-// ============================================================
- 
-app.use(express.urlencoded({ extended: true }));
+
+app.use(express.urlencoded({ extended: false }));
 app.use(express.static('public'));
- 
+
 app.use(session({
-    secret: 'c237_019_team4_secret_key',
+    secret: 'skywings_secret_key',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
 }));
- 
+
 app.use(flash());
- 
+
 app.set('view engine', 'ejs');
- 
-// Makes flash messages and the logged-in user available to every view
-// automatically, so individual routes don't need to pass them by hand.
+
+// make flash messages and logged-in user available to every view automatically
 app.use((req, res, next) => {
     res.locals.success = req.flash('success');
     res.locals.error = req.flash('error');
@@ -244,9 +242,8 @@ const validateRegistration = (req, res, next) => {
 app.get('/', (req, res) => {
     res.render('index');
 });
- 
-// ---------- Student A: Registration ----------
- 
+
+// ---------- STUDENT A: Registration ----------
 app.get('/register', (req, res) => {
     res.render('register');
 });

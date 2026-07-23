@@ -2,299 +2,78 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Book Flight - SkyWings</title>
+    <title>Manage Flights - SkyWings Admin</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
-
 <body>
     <%- include('partials/navbar') %>
     <div class="container">
         <%- include('partials/flash') %>
 
-        <div class="card boarding-card">
-            <div class="boarding-top">
-                <div class="bp-date"><%= new Date(flight.departure_date).toDateString() %></div>
-                <div class="bp-route">
-                    <div class="bp-airport">
-                        <div class="code"><%= flight.origin %></div>
-                    </div>
-                    <div class="bp-route-line">
-                        <span class="bp-dot"></span>
-                        <span class="line"></span>
-                        <span class="plane">✈</span>
-                        <span class="line"></span>
-                        <span class="bp-dot"></span>
-                    </div>
-                    <div class="bp-airport right">
-                        <div class="code"><%= flight.destination %></div>
-                    </div>
-                </div>
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0;">Manage Flights</h2>
+                <a class="btn btn-accent" href="/admin/flights/add">+ Add Flight</a>
             </div>
-            <div class="boarding-meta-row">
-                <div class="item">
-                    <div class="label">Flight</div>
-                    <div class="value"><%= flight.flight_number %></div>
+            <form class="inline" action="/admin" method="GET" style="margin-top:16px;">
+                <div class="field">
+                    <label for="destination">Destination</label>
+                    <input type="text" id="destination" name="destination" value="<%= query.destination %>">
                 </div>
-                <div class="item">
-                    <div class="label">Departs</div>
-                    <div class="value"><%= flight.departure_time %></div>
-                </div>              
-                <div class="item">
-                    <div class="label">Arrives</div>
-                    <div class="value"><%= flight.arrival_time %></div>
-                </div>               
-                <div class="item">
-                    <div class="label">Base Price</div>
-                    <div class="value">$<%= Number(flight.price).toFixed(2) %></div>
+                <div class="field">
+                    <label for="date">Departure Date</label>
+                    <input type="date" id="date" name="date" value="<%= query.date %>">
                 </div>
-                <div class="item">
-                    <div class="label">Seats Left</div>
-                    <div class="value"><%= flight.available_seats %></div>
+                <div class="field">
+                    <label for="sort">Sort By</label>
+                    <select id="sort" name="sort">
+                        <option value="date_asc" <%= query.sort === 'date_asc' ? 'selected' : '' %>>Departure Date</option>
+                        <option value="price_asc" <%= query.sort === 'price_asc' ? 'selected' : '' %>>Price: Low to High</option>
+                        <option value="price_desc" <%= query.sort === 'price_desc' ? 'selected' : '' %>>Price: High to Low</option>
+                    </select>
                 </div>
-            </div>
+                <button type="submit" class="btn">Filter</button>
+                <a href="/admin" class="btn" style="background:var(--muted);">Reset</a>
+            </form>
         </div>
 
-        <form action="/book/<%= flight.id %>" method="POST" id="bookingForm">
-            <div class="card" style="margin-top:16px;">
-                <h2 style="margin-top:0;">Passenger Details</h2>
-                <div class="field">
-                    <label for="first_name">First Name</label>
-                    <input type="text" id="first_name" name="first_name[]" required>
-                </div>
-                <br>
-                <div class="field">
-                    <label for="last_name">Last Name</label>
-                    <input type="text" id="last_name" name="last_name[]" required>
-                </div>
-                <br>
-                <div class="field">
-                    <label for="passenger_number">Passenger Contact Number</label>
-                    <input type="text" id="passenger_number" name="passenger_number[]" required>
-                </div>
-                <br>
-                <div class="field">
-                    <label>Gender</label>
-                    <div class="gender-options">
-                        <label class="gender-option">
-                            <input type="radio" name="passenger_gender[]" value="male" required>
-                            <span>Male</span>
-                        </label>
-                        <label class="gender-option">
-                            <input type="radio" name="passenger_gender[]" value="female" required>
-                            <span>Female</span>
-                        </label>
-                    </div>
-                </div>
-                <br>
-                <div class="field">
-                    <label for="passenger_email">Email</label>
-                    <input type="email" id="passenger_email" name="passenger_email[]" required>
-                </div>
-                <br>
-                <div class="field">
-                    <label for="passenger_passport">Passenger Passport Number</label>
-                    <input type="text" id="passenger_passport" name="passenger_passport[]" placeholder="K12345678" required>
-                </div>
-                <br>
-                <div class="field">
-                    <label for="passenger_dob">Passenger Date of Birth</label>
-                    <input type="date" id="passenger_dob" name="passenger_dob[]" required>
-                </div>
-                <button type="button" id="addPassengerBtn" class="btn-add">+ Add</button>
-                <!-- new blocks drop in here, below the Add button -->
-                <div id="passengerList"></div>
-                <!-- inert until cloned: not required, not submitted until it appears -->
-                <template id="passengerTemplate">
-                    <div class="pax-box">
-                        <button type="button" class="btn-remove" aria-label="Remove">×</button>
-                        <div class="field">
-                            <label>Name</label>
-                            <input type="text" name="passenger_name[]" required>
-                        </div>
-                        <div class="field">
-                            <label>Number</label>
-                            <input type="text" name="passenger_number[]" required>
-                        </div>
-                    </div>
-                </template>
+        <% if (flights.length === 0) { %>
+            <div class="card empty-state">No flights found.</div>
+        <% } else { %>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Flight #</th>
+                            <th>Route</th>
+                            <th>Departure</th>
+                            <th>Price</th>
+                            <th>Seats</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% flights.forEach(f => { %>
+                            <tr>
+                                <td><%= f.flight_number %></td>
+                                <td><%= f.origin %> → <%= f.destination %></td>
+                                <td><%= new Date(f.departure_date).toDateString() %> <%= f.departure_time %></td>
+                                <td>$<%= Number(f.price).toFixed(2) %></td>
+                                <td><%= f.available_seats %> / <%= f.total_seats %></td>
+                                <td>
+                                    <div class="actions">
+                                        <a class="btn btn-sm" href="/admin/flights/edit/<%= f.id %>">Edit</a>
+                                        <form action="/admin/flights/delete/<%= f.id %>" method="POST" onsubmit="return confirm('Delete this flight? This also removes related bookings.');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
             </div>
-
-
-            <h2 style="margin:20px 0 12px;">Select Fare</h2>
-
-            <div class="fare-list">
-
-                <div class="class-tabs">
-                    <button type="button" class="class-tab active" data-class="economy">Economy</button>
-                    <button type="button" class="class-tab" data-class="business">Business/First</button>
-                </div>
-
-
-                <div class="fare-group" data-group="economy">
-
-                    <label class="fare-card">
-                        <input type="radio" name="fare" value="economy_basic" data-class="economy" checked>
-                        <div class="fare-card-inner">
-                            <div class="fare-head">
-                                <span class="fare-price">$<%= Number(flight.price).toFixed(2) %> <small>/ person</small></span>
-                            </div>
-                            <ul class="fare-baggage">
-                                <li class="ok">🧳 Carry-on baggage: 1 × 7 kg</li>
-                                <li class="no">✕ No free checked baggage</li>
-                                <li class="no">✕ Cannot be cancelled or changed</li>
-                            </ul>
-                            <div class="fare-tier">Economy Basic</div>
-                            <div class="fare-select-indicator">Select</div>
-                        </div>
-                    </label>
-
-                    <label class="fare-card">
-                        <input type="radio" name="fare" value="economy_standard" data-class="economy">
-                        <div class="fare-card-inner">
-                            <div class="fare-head">
-                                <span class="fare-price">$<%= Number(flight.price * 1.15).toFixed(2) %> <small>/ person</small></span>
-                            </div>
-                            <ul class="fare-baggage">
-                                <li class="ok">🧳 Carry-on baggage: 1 × 7 kg</li>
-                                <li class="ok">🎒 Checked baggage: 1 × 25 kg</li>
-                                <li class="no">✕ Non-refundable</li>
-                            </ul>
-                            <div class="fare-tier">Economy Standard</div>
-                            <div class="fare-select-indicator">Select</div>
-                        </div>
-                    </label>
-
-            </div>
-
-                <div class="fare-group" data-group="business" style="display:none;">
-
-                    <label class="fare-card">
-                        <input type="radio" name="fare" value="business_lite" data-class="business">
-                        <div class="fare-card-inner">
-                            <div class="fare-head">
-                                <span class="fare-price">$<%= Number(flight.price * 2).toFixed(2) %> <small>/ person</small></span>
-                            </div>
-                            <ul class="fare-baggage">
-                                <li class="ok">🧳 Carry-on baggage: 2 × 7 kg</li>
-                                <li class="ok">🎒 Checked baggage: 40 kg</li>
-                                <li class="no">✕ Non-refundable</li>
-                                <li class="ok">💺 Seat selection available</li>
-                            </ul>
-                            <div class="fare-tier">Business Lite</div>
-                            <div class="fare-select-indicator">Select</div>
-                        </div>
-                    </label>
-
-                    <label class="fare-card">
-                        <input type="radio" name="fare" value="business_standard" data-class="business">
-                        <div class="fare-card-inner">
-                            <div class="fare-head">
-                                <span class="fare-price">$<%= Number(flight.price * 2.5).toFixed(2) %> <small>/ person</small></span>
-                            </div>
-                            <ul class="fare-baggage">
-                                <li class="ok">🧳 Carry-on baggage: 2 × 7 kg</li>
-                                <li class="ok">🎒 Checked baggage: 40 kg</li>
-                                <li class="ok">💰 Cancellation fee: from $200</li>
-                                <li class="ok">💺 Seat selection available</li>
-                            </ul>
-                            <div class="fare-tier">Business Standard</div>
-                            <div class="fare-select-indicator">Select</div>
-                        </div>
-                    </label>
-                </div>
-
-            <div class="card" id="bookingSummary" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div class="label">Passengers</div>
-                    <div class="value" id="summaryPassengerCount">1</div>
-                </div>
-                <div style="text-align:right;">
-                    <div class="label">Total Price</div>
-                    <div class="value" id="summaryTotalPrice">$<%= Number(flight.price).toFixed(2) %></div>
-                </div>
-            </div>
-
-            <button type="submit" class="btn btn-accent" style="margin-top:16px;width:100%;">Confirm Booking</button>
-        </form>
+        <% } %>
     </div>
-
-<script>
-const BASE_PRICE = <%= Number(flight.price) %>;
-// Keep these multipliers in sync with FARE_INFO in app.js and the prices
-// shown on the fare cards above.
-const FARE_MULTIPLIERS = {
-    economy_basic: 1,
-    economy_standard: 1.15,
-    business_lite: 2,
-    business_standard: 2.5
-};
-
-function updateBookingSummary() {
-    const extraPassengers = document.querySelectorAll('#passengerList .pax-box').length;
-    const passengerCount = 1 + extraPassengers;
-
-    const selectedFare = document.querySelector('input[name="fare"]:checked');
-    const multiplier = selectedFare ? (FARE_MULTIPLIERS[selectedFare.value] || 1) : 1;
-
-    const total = BASE_PRICE * passengerCount * multiplier;
-
-    document.getElementById('summaryPassengerCount').textContent = passengerCount;
-    document.getElementById('summaryTotalPrice').textContent = '$' + total.toFixed(2);
-}
-
-document.getElementById('addPassengerBtn').addEventListener('click', function () {
-    const list = document.getElementById('passengerList');
-    const template = document.getElementById('passengerTemplate');
-
-    const clone = template.content.cloneNode(true);
-    const box = clone.querySelector('.pax-box');
-
-    box.querySelector('.btn-remove').addEventListener('click', function () {
-        box.remove();
-        updateBookingSummary();
-    });
-
-    list.appendChild(clone);
-    updateBookingSummary();
-});
-
-// Recalculate whenever a different fare is picked (radio buttons are
-// clicked directly, and also auto-selected by the class-tab switcher below).
-document.querySelectorAll('input[name="fare"]').forEach(radio => {
-    radio.addEventListener('change', updateBookingSummary);
-});
-
-updateBookingSummary();
-</script>
-<script>
-const tabs = document.querySelectorAll('.class-tab');
-const groups = document.querySelectorAll('.fare-group');
-
-tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-        const cls = tab.dataset.class;
-
-        // switch active tab styling
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        // show only the matching fare group
-        groups.forEach(g => {
-            g.style.display = g.dataset.group === cls ? 'block' : 'none';
-        });
-
-        // auto-select the first fare in the newly shown group
-        const firstRadio = document.querySelector(
-            `.fare-group[data-group="${cls}"] input[type="radio"]`
-        );
-        if (firstRadio) {
-            firstRadio.checked = true;
-            updateBookingSummary();
-        }
-    });
-});
-</script>
-
-
 </body>
 </html>
