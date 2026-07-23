@@ -17,7 +17,10 @@
     --success-pale: #e3f6ea;
     --border: #e2e8f0;
     --radius: 18px;
+<<<<<<< HEAD
+=======
     --font-family: 'Poppins', sans-serif;
+>>>>>>> 679e96025f4aedecc45be0c5a28f6fba1bbf9a99
 }
 
 * { box-sizing: border-box; }
@@ -199,6 +202,11 @@ tbody tr:hover { background: #f7fafc; }
 }
 .badge.confirmed { background: var(--success-pale); color: var(--success); }
 .badge.cancelled { background: var(--danger-pale); color: var(--danger); }
+<<<<<<< HEAD
+.badge.seats-low { background: #fff2e0; color: #b56b00; }
+.badge.seats-ok { background: var(--teal-pale); color: var(--teal-dark); }
+
+=======
 .badge.flight-removed { background: #fef3c7; color: #b45309; }
 .badge.seats-low { background: #fff2e0; color: #b56b00; }
 .badge.seats-ok { background: var(--teal-pale); color: var(--teal-dark); }
@@ -214,6 +222,7 @@ tbody tr:hover { background: #f7fafc; }
     font-size: 0.82rem;
 }
 
+>>>>>>> 679e96025f4aedecc45be0c5a28f6fba1bbf9a99
 /* ---------- Flight cards (styled after the "Select Flight" screen) ---------- */
 .flight-grid {
     display: grid;
@@ -293,6 +302,8 @@ tbody tr:hover { background: #f7fafc; }
 /* legacy support (kept in case referenced elsewhere) */
 .flight-card .meta { color: var(--muted); font-size: 0.85rem; margin: 6px 0; }
 
+<<<<<<< HEAD
+=======
 @media (max-width: 768px) {
     nav {
         padding: 14px 16px;
@@ -373,6 +384,7 @@ tbody tr:hover { background: #f7fafc; }
     }
 }
 
+>>>>>>> 679e96025f4aedecc45be0c5a28f6fba1bbf9a99
 /* ---------- Boarding-pass style booking card ---------- */
 .boarding-card { padding: 0; overflow: hidden; }
 

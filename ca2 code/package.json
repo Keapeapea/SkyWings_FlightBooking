@@ -11,8 +11,7 @@
     "ejs": "^3.1.10",
     "express": "^4.22.2",
     "express-session": "^1.19.0",
-    "mysql2": "^3.23.1",
-    "render": "^0.1.4"
+    "mysql2": "^3.23.1"
   },
   "keywords": [],
   "author": "",
