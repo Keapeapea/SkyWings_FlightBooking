@@ -38,11 +38,7 @@
                 <div class="item">
                     <div class="label">Departs</div>
                     <div class="value"><%= flight.departure_time %></div>
-<<<<<<< HEAD
                 </div>
-=======
-                </div>              
->>>>>>> aae0cfe573be64e40896bc1fb24dd8361e15ebc5
                 <div class="item">
                     <div class="label">Arrives</div>
                     <div class="value"><%= flight.arrival_time %></div>
@@ -119,6 +115,32 @@
                             <label>Number</label>
                             <input type="text" name="passenger_number[]" required>
                         </div>
+                        <div class="field">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label class="gender-option">
+                                    <input type="radio" name="passenger_gender[]" value="male" required>
+                                    <span>Male</span>
+                                </label>
+                                <label class="gender-option">
+                                    <input type="radio" name="passenger_gender[]" value="female" required>
+                                    <span>Female</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Email</label>
+                            <input type="email" name="passenger_email[]" required>      
+                        </div>  
+                        <div class="field">
+                            <label>Passport Number</label>
+                            <input type="text" name="passenger_passport[]" placeholder="K12345678" required>        
+                        </div>
+                        <div class="field">
+                            <label>Date of Birth</label>
+                            <input type="date" name="passenger_dob[]" required>
+                        </div>
+                        
                     </div>
                 </template>
             </div>
@@ -150,8 +172,9 @@
                             </div>
                             <ul class="fare-baggage">
                                 <li class="ok">🧳 Carry-on baggage: 1 × 7 kg</li>
-                                <li class="no">✕ No free checked baggage</li>
-                                <li class="no">✕ Cannot be cancelled or changed</li>
+                                <li class="ok">💺 Seat selection available</li>
+                                <li class="no">🚫 No checked baggage included</li>
+                                <li class="no">💰 Cancellation fee: from $200</li>
                             </ul>
                             <div class="fare-tier">Economy Basic</div>
                             <div class="fare-select-indicator">Select</div>
@@ -166,8 +189,10 @@
                             </div>
                             <ul class="fare-baggage">
                                 <li class="ok">🧳 Carry-on baggage: 1 × 7 kg</li>
-                                <li class="ok">🎒 Checked baggage: 1 × 25 kg</li>
-                                <li class="no">✕ Non-refundable</li>
+                                <li class="ok">🧳 Checked baggage: 1 × 25 kg</li>
+                                <li class="ok">💺 Seat selection available</li>
+                                <li class="no">🚫 No checked baggage included</li>
+                                <li class="no">💰 Cancellation fee: from $143</li>
                             </ul>
                             <div class="fare-tier">Economy Standard</div>
                             <div class="fare-select-indicator">Select</div>
@@ -186,9 +211,9 @@
                             </div>
                             <ul class="fare-baggage">
                                 <li class="ok">🧳 Carry-on baggage: 2 × 7 kg</li>
-                                <li class="ok">🎒 Checked baggage: 40 kg</li>
-                                <li class="no">✕ Non-refundable</li>
+                                <li class="ok">🧳 Checked baggage: 40 kg</li>
                                 <li class="ok">💺 Seat selection available</li>
+                                <li class="ok">💰 Cancellation fee: from $130</li>
                             </ul>
                             <div class="fare-tier">Business Lite</div>
                             <div class="fare-select-indicator">Select</div>
@@ -203,9 +228,9 @@
                             </div>
                             <ul class="fare-baggage">
                                 <li class="ok">🧳 Carry-on baggage: 2 × 7 kg</li>
-                                <li class="ok">🎒 Checked baggage: 40 kg</li>
-                                <li class="ok">💰 Cancellation fee: from $200</li>
+                                <li class="ok">🧳 Checked baggage: 40 kg</li>
                                 <li class="ok">💺 Seat selection available</li>
+                                <li class="ok">💰 Free cancellation</li>
                             </ul>
                             <div class="fare-tier">Business Standard</div>
                             <div class="fare-select-indicator">Select</div>
@@ -246,13 +271,24 @@ function currentPassengerCount() {
 // Read by partials/seatmap.ejs so it knows how many seats can be picked.
 window.getMaxSelectableSeats = currentPassengerCount;
 
+// Guards against an infinite loop: this function calls seatmapTrimToMax /
+// seatmapRefreshSummary below, which dispatch the same 'seatmap:change'
+// event this function also listens for.
+let _updatingSummary = false;
+
 function updateBookingSummary() {
+    if (_updatingSummary) return;
+    _updatingSummary = true;
+
     const passengerCount = currentPassengerCount();
 
     const selectedFare = document.querySelector('input[name="fare"]:checked');
     const multiplier = selectedFare ? (FARE_MULTIPLIERS[selectedFare.value] || 1) : 1;
 
-    const total = BASE_PRICE * passengerCount * multiplier;
+    // Enhancement: any business/first seat picked on the seat map adds a
+    // flat surcharge on top of the fare-based total (see partials/seatmap.ejs).
+    const seatSurchargeTotal = window.getSeatSurchargeTotal ? window.getSeatSurchargeTotal() : 0;
+    const total = BASE_PRICE * passengerCount * multiplier + seatSurchargeTotal;
 
     document.getElementById('summaryPassengerCount').textContent = passengerCount;
     document.getElementById('summaryTotalPrice').textContent = '$' + total.toFixed(2);
@@ -260,7 +296,12 @@ function updateBookingSummary() {
     // If passengers were removed, drop any extra selected seats and refresh the label.
     if (window.seatmapTrimToMax) window.seatmapTrimToMax();
     if (window.seatmapRefreshSummary) window.seatmapRefreshSummary();
+
+    _updatingSummary = false;
 }
+
+// Recalculate whenever the seat selection changes (seat picked/removed via the popup).
+document.addEventListener('seatmap:change', updateBookingSummary);
 
 document.getElementById('addPassengerBtn').addEventListener('click', function () {
     const list = document.getElementById('passengerList');
@@ -281,7 +322,19 @@ document.getElementById('addPassengerBtn').addEventListener('click', function ()
 // Recalculate whenever a different fare is picked (radio buttons are
 // clicked directly, and also auto-selected by the class-tab switcher below).
 document.querySelectorAll('input[name="fare"]').forEach(radio => {
-    radio.addEventListener('change', updateBookingSummary);
+
+    radio.addEventListener('change', () => {
+
+        updateBookingSummary();
+
+        if(window.updateSeatRestrictions){
+
+            window.updateSeatRestrictions();
+
+        }
+
+    });
+
 });
 
 updateBookingSummary();
@@ -319,6 +372,9 @@ tabs.forEach(tab => {
         if (firstRadio) {
             firstRadio.checked = true;
             updateBookingSummary();
+            if(window.updateSeatRestrictions){
+                window.updateSeatRestrictions();
+            }
         }
     });
 });

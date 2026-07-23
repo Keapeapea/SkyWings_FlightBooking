@@ -1,4 +1,3 @@
-
 const express = require('express');
 const mysql = require('mysql2');
 const session = require('express-session');
@@ -43,7 +42,6 @@ db.connect((err) => {
             console.log('bookings.status column is ready.');
         }
     });
-<<<<<<< HEAD
 
     db.query('ALTER TABLE bookings ADD COLUMN seat_numbers VARCHAR(255) NULL', (err) => {
         if (err) {
@@ -73,8 +71,28 @@ db.connect((err) => {
             console.log('seats table is ready.');
         }
     });
-=======
->>>>>>> aae0cfe573be64e40896bc1fb24dd8361e15ebc5
+
+    // Enhancement: profile page fields (display name, gender, region).
+    // Added one at a time with the same "skip if it already exists" pattern
+    // used above, so re-running the server is always safe.
+    const profileColumns = [
+        { name: 'display_name', ddl: 'ALTER TABLE users ADD COLUMN display_name VARCHAR(100) NULL' },
+        { name: 'gender', ddl: 'ALTER TABLE users ADD COLUMN gender VARCHAR(20) NULL' },
+        { name: 'region', ddl: 'ALTER TABLE users ADD COLUMN region VARCHAR(100) NULL' }
+    ];
+    profileColumns.forEach(col => {
+        db.query(col.ddl, (err) => {
+            if (err) {
+                if (err.code === 'ER_DUP_FIELDNAME') {
+                    console.log(`users.${col.name} column already exists - skipping.`);
+                } else {
+                    console.error(`Could not add users.${col.name} column:`, err.message);
+                }
+            } else {
+                console.log(`users.${col.name} column added.`);
+            }
+        });
+    });
 });
  
 // ============================================================
@@ -291,6 +309,37 @@ app.get('/logout', (req, res) => {
     });
 });
  
+// ---------- Profile: view / update display name, gender, region ----------
+
+app.get('/profile', checkAuthenticated, (req, res) => {
+    const sql = 'SELECT * FROM users WHERE id = ?';
+    db.query(sql, [req.session.user.id], (err, results) => {
+        if (err) throw err;
+        if (results.length === 0) {
+            req.flash('error', 'User not found.');
+            return res.redirect('/');
+        }
+        res.render('profile', { profileUser: results[0] });
+    });
+});
+
+app.post('/profile', checkAuthenticated, (req, res) => {
+    const { display_name, gender, region } = req.body;
+
+    const sql = 'UPDATE users SET display_name = ?, gender = ?, region = ? WHERE id = ?';
+    db.query(sql, [display_name || null, gender || null, region || null, req.session.user.id], (err) => {
+        if (err) throw err;
+
+        // Keep the session copy in sync so the navbar greeting updates immediately.
+        req.session.user.display_name = display_name || null;
+        req.session.user.gender = gender || null;
+        req.session.user.region = region || null;
+
+        req.flash('success', 'Profile updated successfully!');
+        res.redirect('/profile');
+    });
+});
+
 // ============================================================
 // Customer routes
 // ============================================================
@@ -411,27 +460,37 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
                 return res.redirect(`/book/${flightId}`);
             }
 
-            // Total = base price x number of passengers x fare multiplier.
-            const totalPrice = flight.price * passengerCount * multiplier;
-
-            const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, seat_numbers, status)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`;
-            db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice, seatNumbers.join(', ')], (err, insertResult) => {
+            // Enhancement: pull each selected seat's class so any premium-seat
+            // surcharge (business/first) gets added to the total - previously
+            // this only happened on the edit-booking route.
+            const seatClassSql = 'SELECT seat_number, seat_class FROM seats WHERE flight_id = ? AND seat_number IN (?)';
+            db.query(seatClassSql, [flightId, seatNumbers], (err, seatRows) => {
                 if (err) throw err;
 
-                const bookingId = insertResult.insertId;
+                const seatSurchargeTotal = seatRows.reduce((sum, s) => sum + getSeatSurcharge(s.seat_class), 0);
 
-                // Claim the seats for this booking.
-                const claimSeatsSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
-                db.query(claimSeatsSql, [bookingId, flightId, seatNumbers], (err) => {
+                // Total = (base price x number of passengers x fare multiplier) + any seat surcharges.
+                const totalPrice = flight.price * passengerCount * multiplier + seatSurchargeTotal;
+
+                const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, seat_numbers, status)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`;
+                db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice, seatNumbers.join(', ')], (err, insertResult) => {
                     if (err) throw err;
 
-                    // Enhancement: decrement available seats after a successful booking.
-                    const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
-                    db.query(updateSeatsSql, [passengerCount, flightId], (err) => {
+                    const bookingId = insertResult.insertId;
+
+                    // Claim the seats for this booking.
+                    const claimSeatsSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
+                    db.query(claimSeatsSql, [bookingId, flightId, seatNumbers], (err) => {
                         if (err) throw err;
-                        req.flash('success', 'Flight booked successfully!');
-                        res.redirect('/my-bookings');
+
+                        // Enhancement: decrement available seats after a successful booking.
+                        const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
+                        db.query(updateSeatsSql, [passengerCount, flightId], (err) => {
+                            if (err) throw err;
+                            req.flash('success', 'Flight booked successfully!');
+                            res.redirect('/my-bookings');
+                        });
                     });
                 });
             });
@@ -778,8 +837,7 @@ app.get("/book/:id", (req, res) => {
 });
 
 
-
 // Starting the server
 app.listen(3000, () => {
     console.log('SkyWings server started on http://localhost:3000');
-}); 
+});

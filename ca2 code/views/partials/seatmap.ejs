@@ -112,6 +112,8 @@ function classOfRow(rowNum) {
                                 class="seat-btn <%= seat.seat_class %> <%= seat.taken ? 'taken' : '' %> <%= isMine ? 'selected' : '' %>"
                                 data-seat="<%= seat.seat_number %>"
                                 data-class="<%= seat.seat_class %>"
+                                data-class-label="<%= CLASS_LABEL[seat.seat_class] || seat.seat_class %>"
+                                data-price-label="<%= seat.seat_class === 'economy' ? 'Included' : ('+' + fmtSgd(extraFor(seat.seat_class))) %>"
                                 <%= seat.taken ? 'disabled' : '' %>
                                 title="<%= seat.seat_number %> (<%= CLASS_LABEL[seat.seat_class] || seat.seat_class %>)">
                             <%= seat.seat_number %>
@@ -130,6 +132,19 @@ function classOfRow(rowNum) {
         <span id="seatmapSelectedText">No seats selected yet</span>
     </div>
     <div id="seatmapHiddenInputs"></div>
+
+    <div class="seat-modal-overlay" id="seatModalOverlay">
+        <div class="seat-modal">
+            <button type="button" class="seat-modal-close" id="seatModalClose" aria-label="Close">&times;</button>
+            <div class="seat-modal-top">
+                <span class="seat-modal-num" id="seatModalNum">1A</span>
+                <span class="seat-modal-price" id="seatModalPrice">Included</span>
+            </div>
+            <div class="seat-modal-class" id="seatModalClass">Economy</div>
+            <p class="seat-modal-note" id="seatModalNote"></p>
+            <button type="button" class="btn btn-accent seat-modal-action" id="seatModalAction">Select</button>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -303,6 +318,81 @@ function classOfRow(rowNum) {
     .seatmap-container { flex-direction: column; }
     .seatmap-legend-panel { width: 100%; }
 }
+
+/* ---- Seat detail popup ---- */
+.seat-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 36, 64, 0.45);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.seat-modal-overlay.open { display: flex; }
+
+.seat-modal {
+    position: relative;
+    background: #fff;
+    border-radius: 18px;
+    padding: 26px 24px 22px;
+    width: 100%;
+    max-width: 300px;
+    box-shadow: 0 20px 50px rgba(15, 36, 64, 0.25);
+    text-align: center;
+}
+
+.seat-modal-close {
+    position: absolute;
+    top: 10px; right: 12px;
+    border: none; background: none;
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--sm-slate-400);
+    cursor: pointer;
+    padding: 4px;
+}
+.seat-modal-close:hover { color: var(--sm-slate-700); }
+
+.seat-modal-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+.seat-modal-num {
+    font-family: 'Poppins', inherit;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--sm-navy);
+}
+.seat-modal-price {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--sm-blue-700);
+}
+.seat-modal-class {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--sm-slate-600);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.seat-modal-note {
+    margin: 14px 0 4px;
+    font-size: 0.85rem;
+    color: var(--sm-slate-600);
+}
+.seat-modal-action {
+    width: 100%;
+    margin-top: 14px;
+}
+.seat-modal-action.remove {
+    background: var(--sm-slate-600) !important;
+}
 </style>
 
 <script>
@@ -313,7 +403,19 @@ function classOfRow(rowNum) {
     const banner = document.getElementById('seatmapBanner');
     const bannerText = document.getElementById('seatmapBannerText');
 
+    // Flat SGD surcharge per seat class - mirrors SEAT_SURCHARGE in app.js.
+    const SEAT_SURCHARGE = { economy: 0, business: 79.80, first: 138.80 };
+
+    const overlay = document.getElementById('seatModalOverlay');
+    const modalNum = document.getElementById('seatModalNum');
+    const modalPrice = document.getElementById('seatModalPrice');
+    const modalClass = document.getElementById('seatModalClass');
+    const modalNote = document.getElementById('seatModalNote');
+    const modalAction = document.getElementById('seatModalAction');
+    const modalClose = document.getElementById('seatModalClose');
+
     let selectedSeats = <%- JSON.stringify(_preSelected) %>;
+    let modalSeatBtn = null; // the seat-btn currently shown in the popup
 
     // Pages that let the passenger count change (book.ejs) can set
     // window.getMaxSelectableSeats = () => <current count>; otherwise it's fixed.
@@ -351,27 +453,85 @@ function classOfRow(rowNum) {
     function refresh() {
         renderHiddenInputs();
         renderSummary();
+        // Let the host page (book.ejs / edit-booking.ejs) know something
+        // changed, so it can recompute the total price shown on screen.
+        document.dispatchEvent(new CustomEvent('seatmap:change', {
+            detail: { selectedSeats: selectedSeats.slice() }
+        }));
+    }
+
+    // Exposed for host pages to add per-seat surcharges into their own total.
+    window.getSeatSurchargeTotal = function () {
+        let total = 0;
+        selectedSeats.forEach(seatNum => {
+            const btn = plane.querySelector(`.seat-btn[data-seat="${seatNum}"]`);
+            if (btn) total += SEAT_SURCHARGE[btn.dataset.class] || 0;
+        });
+        return total;
+    };
+
+    function closeModal() {
+        overlay.classList.remove('open');
+        modalSeatBtn = null;
+    }
+
+    function openModalFor(btn) {
+        modalSeatBtn = btn;
+        const seatNum = btn.dataset.seat;
+        const isSelected = selectedSeats.includes(seatNum);
+        const max = getMax();
+
+        modalNum.textContent = seatNum;
+        modalPrice.textContent = btn.dataset.priceLabel || 'Included';
+        modalClass.textContent = btn.dataset.classLabel || '';
+
+        if (isSelected) {
+            modalNote.textContent = '';
+            modalAction.textContent = 'Remove seat';
+            modalAction.classList.add('remove');
+            modalAction.disabled = false;
+        } else if (selectedSeats.length >= max) {
+            modalNote.textContent = `You've already selected ${max} seat(s). Deselect one first, or add another passenger.`;
+            modalAction.textContent = 'Seat limit reached';
+            modalAction.classList.remove('remove');
+            modalAction.disabled = true;
+        } else {
+            modalNote.textContent = '';
+            modalAction.textContent = 'Select seat';
+            modalAction.classList.remove('remove');
+            modalAction.disabled = false;
+        }
+
+        overlay.classList.add('open');
     }
 
     plane.addEventListener('click', function (e) {
         const btn = e.target.closest('.seat-btn');
         if (!btn || btn.disabled) return;
+        openModalFor(btn);
+    });
 
-        const seatNum = btn.dataset.seat;
-        const max = getMax();
+    modalAction.addEventListener('click', function () {
+        if (!modalSeatBtn || modalAction.disabled) return;
+        const seatNum = modalSeatBtn.dataset.seat;
 
         if (selectedSeats.includes(seatNum)) {
             selectedSeats = selectedSeats.filter(s => s !== seatNum);
-            btn.classList.remove('selected');
+            modalSeatBtn.classList.remove('selected');
         } else {
-            if (selectedSeats.length >= max) {
-                alert(`You can only select ${max} seat(s) for ${max} passenger(s). Deselect one first, or add another passenger.`);
-                return;
-            }
             selectedSeats.push(seatNum);
-            btn.classList.add('selected');
+            modalSeatBtn.classList.add('selected');
         }
         refresh();
+        closeModal();
+    });
+
+    modalClose.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
     });
 
     // Exposed so the page's "add/remove passenger" JS can trim selection
@@ -386,6 +546,33 @@ function classOfRow(rowNum) {
         refresh();
     };
     window.seatmapRefreshSummary = refresh;
+    window.updateSeatRestrictions = function () {
+    const fare = document.querySelector('input[name="fare"]:checked');
+    if (!fare) return;
+    const isBusiness = fare.value.startsWith("business");
+    document.querySelectorAll(".seat-btn").forEach(btn => {
+        if (btn.classList.contains("taken")) return;
+        const seatClass = btn.dataset.class;
+        if (isBusiness) {
+            if (seatClass === "economy") {
+                btn.disabled = true;
+                btn.style.opacity = "0.35";
+            } else {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
+        } else {
+            if (seatClass === "business" || seatClass === "first") {
+                btn.disabled = true;
+                btn.style.opacity = "0.35";
+            } else {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
+        }
+    });
+};
+    
 
     refresh();
 })();

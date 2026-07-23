@@ -86,8 +86,6 @@
 
 <script>
 const BASE_PRICE = <%= Number(booking.price) %>;
-// Same flat SGD surcharges as SEAT_SURCHARGE in app.js / seatmap.ejs.
-const SEAT_SURCHARGE = { economy: 0, business: 79.80, first: 138.80 };
 
 // Unlike book.ejs, there's no fixed passenger-count field here - the
 // number of seats selected on the map *is* the passenger count. So the
@@ -96,30 +94,21 @@ function refreshEditSummary() {
     const hiddenInputs = document.querySelectorAll('#seatmapHiddenInputs input');
     const count = hiddenInputs.length;
 
-    // Figure out which class the selected seats belong to, by reading the
-    // data-class of each matching seat button (all selections should share
-    // one class - the server enforces this too).
-    let seatClass = 'economy';
-    if (count > 0) {
-        const firstSeat = hiddenInputs[0].value;
-        const btn = document.querySelector(`.seat-btn[data-seat="${firstSeat}"]`);
-        if (btn) seatClass = btn.dataset.class;
-    }
-
-    const surcharge = SEAT_SURCHARGE[seatClass] || 0;
-    const total = count * (BASE_PRICE + surcharge);
+    // Enhancement: sum the per-seat surcharge across whatever's selected
+    // (see partials/seatmap.ejs) - the server still enforces a single class
+    // per booking, so in practice this is one class x count, but summing
+    // per-seat works either way.
+    const surchargeTotal = window.getSeatSurchargeTotal ? window.getSeatSurchargeTotal() : 0;
+    const total = count * BASE_PRICE + surchargeTotal;
 
     document.getElementById('summaryPassengerCount').textContent = count;
     document.getElementById('editPassengerCount').textContent = count;
     document.getElementById('summaryTotalPrice').textContent = 'S$' + total.toFixed(2);
 }
 
-// The seatmap partial calls this after every click via a MutationObserver-free
-// approach: we just watch clicks on the plane directly.
-document.getElementById('seatmapPlane').addEventListener('click', function () {
-    // Let the seatmap partial's own click handler run first, then refresh.
-    setTimeout(refreshEditSummary, 0);
-});
+// Seat selection now happens through the popup (see partials/seatmap.ejs),
+// which dispatches this event whenever the selection actually changes.
+document.addEventListener('seatmap:change', refreshEditSummary);
 
 document.getElementById('editBookingForm').addEventListener('submit', function (e) {
     const picked = document.querySelectorAll('#seatmapHiddenInputs input').length;

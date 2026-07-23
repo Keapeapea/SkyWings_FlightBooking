@@ -3,45 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile</title>
-
-  <linkstyle.css
+    <title>My Profile - SkyWings</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 
 <body>
+    <%- include('partials/navbar') %>
 
-<%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
 
-<div class="container">
+        <div class="card profile-card">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <%= (profileUser.display_name || profileUser.username).charAt(0).toUpperCase() %>
+                </div>
+                <div>
+                    <h1 style="margin:0;"><%= profileUser.display_name || profileUser.username %></h1>
+                    <p class="muted-text" style="margin:4px 0 0;"><%= profileUser.email %></p>
+                </div>
+            </div>
 
-    <div class="form-card">
+            <hr class="bp-divider" style="margin:22px 0;">
 
-        <h1>My Profile</h1>
+            <h2 style="margin-top:0;">Account details</h2>
+            <form class="profile-readonly-form">
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" value="<%= profileUser.username %>" disabled>
+                </div>
+                <div class="field">
+                    <label>Email</label>
+                    <input type="text" value="<%= profileUser.email %>" disabled>
+                </div>
+            </form>
 
-        <div class="form-group">
-            <label>Username</label>
-            <input
-                type="text"
-                value="<%= user.username %>"
-                readonly>
+            <h2>Personal information</h2>
+            <p class="meta" style="margin-top:-6px;">These details are used to personalize your SkyWings experience.</p>
+
+            <form action="/profile" method="POST">
+                <div class="field">
+                    <label for="display_name">Display Name</label>
+                    <input type="text" id="display_name" name="display_name" placeholder="How should we greet you?"
+                           value="<%= profileUser.display_name || '' %>" maxlength="100">
+                </div>
+
+                <div class="field">
+                    <label>Gender</label>
+                    <div class="gender-options">
+                        <label class="gender-option">
+                            <input type="radio" name="gender" value="male" <%= profileUser.gender === 'male' ? 'checked' : '' %>>
+                            <span>Male</span>
+                        </label>
+                        <label class="gender-option">
+                            <input type="radio" name="gender" value="female" <%= profileUser.gender === 'female' ? 'checked' : '' %>>
+                            <span>Female</span>
+                        </label>
+                        <label class="gender-option">
+                            <input type="radio" name="gender" value="other" <%= profileUser.gender === 'other' ? 'checked' : '' %>>
+                            <span>Other</span>
+                        </label>
+                        <label class="gender-option">
+                            <input type="radio" name="gender" value="" <%= !profileUser.gender ? 'checked' : '' %>>
+                            <span>Prefer not to say</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="region">Region</label>
+                    <select id="region" name="region">
+                        <option value="">Prefer not to say</option>
+                        <% const regions = ['Singapore', 'Malaysia', 'Indonesia', 'Thailand', 'Vietnam', 'Philippines',
+                                             'Japan', 'South Korea', 'China', 'Taiwan', 'Hong Kong', 'India',
+                                             'Australia', 'United Kingdom', 'United States', 'Other']; %>
+                        <% regions.forEach(r => { %>
+                            <option value="<%= r %>" <%= profileUser.region === r ? 'selected' : '' %>><%= r %></option>
+                        <% }) %>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-accent" style="margin-top:8px;">Save Changes</button>
+            </form>
+
+            <a class="btn" style="background:var(--muted); margin-top:12px; display:inline-block;"
+               href="<%= profileUser.role === 'admin' ? '/admin' : '/dashboard' %>">Back to Dashboard</a>
         </div>
-
-        <div class="form-group">
-            <label>Email</label>
-            <input
-                type="text"
-                value="<%= user.email %>"
-                readonly>
-        </div>
-
-        /dashboard
-            Back to Dashboard
-        </button>
-
     </div>
-
-</div>
-
 </body>
 </html>
- 

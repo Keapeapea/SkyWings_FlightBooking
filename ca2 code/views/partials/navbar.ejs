@@ -9,7 +9,7 @@
                 <a href="/dashboard">Browse Flights</a>
                 <a href="/my-bookings">My Bookings</a>
             <% } %>
-            <span style="color:#dce8f5; margin-left:20px;">Hi, <%= user.username %></span>
+            <a class="navbar-greeting" href="/profile">Hi, <%= user.display_name || user.username %></a>
             <a href="/logout">Logout</a>
         <% } else { %>
             <a href="/login">Login</a>
