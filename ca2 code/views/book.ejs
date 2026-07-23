@@ -203,11 +203,45 @@
                     </label>
                 </div>
 
+            <div class="card" id="bookingSummary" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div class="label">Passengers</div>
+                    <div class="value" id="summaryPassengerCount">1</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="label">Total Price</div>
+                    <div class="value" id="summaryTotalPrice">$<%= Number(flight.price).toFixed(2) %></div>
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-accent" style="margin-top:16px;width:100%;">Confirm Booking</button>
         </form>
     </div>
 
 <script>
+const BASE_PRICE = <%= Number(flight.price) %>;
+// Keep these multipliers in sync with FARE_INFO in app.js and the prices
+// shown on the fare cards above.
+const FARE_MULTIPLIERS = {
+    economy_basic: 1,
+    economy_standard: 1.15,
+    business_lite: 2,
+    business_standard: 2.5
+};
+
+function updateBookingSummary() {
+    const extraPassengers = document.querySelectorAll('#passengerList .pax-box').length;
+    const passengerCount = 1 + extraPassengers;
+
+    const selectedFare = document.querySelector('input[name="fare"]:checked');
+    const multiplier = selectedFare ? (FARE_MULTIPLIERS[selectedFare.value] || 1) : 1;
+
+    const total = BASE_PRICE * passengerCount * multiplier;
+
+    document.getElementById('summaryPassengerCount').textContent = passengerCount;
+    document.getElementById('summaryTotalPrice').textContent = '$' + total.toFixed(2);
+}
+
 document.getElementById('addPassengerBtn').addEventListener('click', function () {
     const list = document.getElementById('passengerList');
     const template = document.getElementById('passengerTemplate');
@@ -217,10 +251,20 @@ document.getElementById('addPassengerBtn').addEventListener('click', function ()
 
     box.querySelector('.btn-remove').addEventListener('click', function () {
         box.remove();
+        updateBookingSummary();
     });
 
     list.appendChild(clone);
+    updateBookingSummary();
 });
+
+// Recalculate whenever a different fare is picked (radio buttons are
+// clicked directly, and also auto-selected by the class-tab switcher below).
+document.querySelectorAll('input[name="fare"]').forEach(radio => {
+    radio.addEventListener('change', updateBookingSummary);
+});
+
+updateBookingSummary();
 </script>
 <script>
 const tabs = document.querySelectorAll('.class-tab');
@@ -243,7 +287,10 @@ tabs.forEach(tab => {
         const firstRadio = document.querySelector(
             `.fare-group[data-group="${cls}"] input[type="radio"]`
         );
-        if (firstRadio) firstRadio.checked = true;
+        if (firstRadio) {
+            firstRadio.checked = true;
+            updateBookingSummary();
+        }
     });
 });
 </script>

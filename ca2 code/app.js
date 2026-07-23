@@ -1,4 +1,3 @@
-
 const express = require('express');
 const mysql = require('mysql2');
 const session = require('express-session');
@@ -49,7 +48,7 @@ db.connect((err) => {
 // App-level middleware
 // ============================================================
  
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
  
 app.use(session({
@@ -77,6 +76,19 @@ app.use((req, res, next) => {
 const CLASS_MULTIPLIER = { economy: 1, business: 2, first: 3 };
 function getMultiplier(seatClass) {
     return CLASS_MULTIPLIER[seatClass] || 1;
+}
+
+// Maps the `fare` radio value from book.ejs to a seat class + per-person
+// price multiplier. Keep these numbers in sync with the prices shown on
+// the fare cards in book.ejs.
+const FARE_INFO = {
+    economy_basic:      { seatClass: 'economy',  multiplier: 1 },
+    economy_standard:   { seatClass: 'economy',  multiplier: 1.15 },
+    business_lite:      { seatClass: 'business', multiplier: 2 },
+    business_standard:  { seatClass: 'business', multiplier: 2.5 }
+};
+function getFareInfo(fare) {
+    return FARE_INFO[fare] || { seatClass: 'economy', multiplier: 1 };
 }
  
 // ============================================================
@@ -245,13 +257,41 @@ app.get('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
  
 app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     const flightId = req.params.flightId;
-    const {first_name, last_name, passenger_number, passenger_gender,passenger_email,passenger_passport,passenger_dob,fare } = req.body;
 
-    if (!first_name || !last_name || !passenger_number || !passenger_gender || !passenger_email || !passenger_passport || !passenger_dob || !fare) {
+    // With extended:true, name="first_name[]" etc. parse into arrays on
+    // req.body.first_name / req.body.last_name / req.body.passenger_number.
+    // Helper: always return an array, even if a field was omitted entirely.
+    const asArray = (val) => (val === undefined ? [] : (Array.isArray(val) ? val : [val]));
+
+    const firstNames   = asArray(req.body.first_name);
+    const lastNames    = asArray(req.body.last_name);
+    const genders      = asArray(req.body.passenger_gender);
+    const emails       = asArray(req.body.passenger_email);
+    const passports    = asArray(req.body.passenger_passport);
+    const dobs         = asArray(req.body.passenger_dob);
+    // passenger_number[] is used by BOTH the main passenger field and every
+    // "+ Add" block, so this array already contains one entry per passenger.
+    const numbers      = asArray(req.body.passenger_number);
+    // passenger_name[] only exists for extra passengers added via the template.
+    const extraNames   = asArray(req.body.passenger_name);
+    const fare         = req.body.fare;
+
+    const mainOk = firstNames[0] && lastNames[0] && genders[0] && emails[0] && passports[0] && dobs[0] && numbers[0];
+    if (!mainOk || !fare) {
         req.flash('error', 'Please provide valid passenger details.');
         return res.redirect(`/book/${flightId}`);
     }
- 
+
+    // Total passenger count = the main passenger + however many extra
+    // passenger blocks were added and actually filled in.
+    const passengerCount = 1 + extraNames.filter(n => n && n.trim()).length;
+
+    // Build one readable name string to store in the single passenger_name column.
+    const allNames = [`${firstNames[0]} ${lastNames[0]}`, ...extraNames.filter(n => n && n.trim())];
+    const passengerNames = allNames.join(', ');
+
+    const { seatClass, multiplier } = getFareInfo(fare);
+
     const flightSql = 'SELECT * FROM flights WHERE id = ?';
     db.query(flightSql, [flightId], (err, results) => {
         if (err) throw err;
@@ -268,11 +308,12 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
             return res.redirect(`/book/${flightId}`);
         }
  
-        const totalPrice = flight.price * passengerCount * getMultiplier(seat_class);
+        // Total = base price x number of passengers x fare multiplier.
+        const totalPrice = flight.price * passengerCount * multiplier;
  
         const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, status)
                             VALUES (?, ?, ?, ?, ?, ?, 'confirmed')`;
-        db.query(insertSql, [req.session.user.id, flightId, passenger_name, passengerCount, seat_class, totalPrice], (err) => {
+        db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice], (err) => {
             if (err) throw err;
  
             // Enhancement: decrement available seats after a successful booking.
@@ -581,4 +622,4 @@ app.get("/book/:id", (req, res) => {
 // Starting the server
 app.listen(3000, () => {
     console.log('SkyWings server started on http://localhost:3000');
-}); 
+});
