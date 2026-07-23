@@ -1,0 +1,392 @@
+<%
+// Expected locals:
+//   seatMap        - array of { seat_number, seat_class, taken, mine } from getSeatMap()
+//   preSelected     - array of seat_number strings that should start selected (edit page only)
+//   maxSeatsInputId - id of an element whose textContent/value holds the current max
+//                     selectable seat count (kept in sync by the page's own JS).
+//                     If omitted, defaults to a fixed number via `maxSeats`.
+//   maxSeats        - fallback fixed max (used when maxSeatsInputId isn't provided)
+
+const _preSelected = typeof preSelected !== 'undefined' ? preSelected : [];
+const _maxSeats = typeof maxSeats !== 'undefined' ? maxSeats : 1;
+
+// Flat SGD surcharge per seat class - keep this in sync with SEAT_SURCHARGE in app.js.
+// Economy is included in the base fare; Business/First add a fixed amount per seat.
+const SEAT_SURCHARGE = { economy: 0, business: 79.80, first: 138.80 };
+const CLASS_LABEL = { economy: 'Economy', business: 'Business', first: 'First Class' };
+
+function fmtSgd(n) {
+    return 'S$' + n.toFixed(2);
+}
+function extraFor(seatClass) {
+    return SEAT_SURCHARGE[seatClass] || 0;
+}
+
+// Group seats by row number, in seat_number order (already sorted by the query).
+const rowsMap = {};
+seatMap.forEach(s => {
+    if (!rowsMap[s.row]) rowsMap[s.row] = {};
+    rowsMap[s.row][s.letter] = s;
+});
+const rowNumbers = Object.keys(rowsMap).map(Number).sort((a, b) => a - b);
+const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+// Figure out the class represented by each row (first seat found), so we can
+// drop in a section divider whenever the class changes going down the plane.
+function classOfRow(rowNum) {
+    const row = rowsMap[rowNum];
+    const seat = LETTERS.map(l => row[l]).find(Boolean);
+    return seat ? seat.seat_class : 'economy';
+}
+%>
+<div class="seatmap-wrap">
+    <div class="seatmap-banner" id="seatmapBanner">
+        <span class="seatmap-banner-icon">✓</span>
+        <span id="seatmapBannerText">You haven't selected a seat yet</span>
+    </div>
+
+    <div class="seatmap-container">
+        <div class="seatmap-legend-panel">
+            <div class="seatmap-legend-list">
+                <div class="legend-row">
+                    <span class="seat-swatch economy"></span>
+                    <span class="legend-label"><%= CLASS_LABEL.economy %></span>
+                    <span class="legend-price">Included</span>
+                </div>
+                <div class="legend-row">
+                    <span class="seat-swatch business"></span>
+                    <span class="legend-label"><%= CLASS_LABEL.business %></span>
+                    <span class="legend-price">+<%= fmtSgd(extraFor('business')) %></span>
+                </div>
+                <div class="legend-row">
+                    <span class="seat-swatch first"></span>
+                    <span class="legend-label"><%= CLASS_LABEL.first %></span>
+                    <span class="legend-price">+<%= fmtSgd(extraFor('first')) %></span>
+                </div>
+                <div class="legend-row">
+                    <span class="seat-swatch taken"></span>
+                    <span class="legend-label">Taken</span>
+                    <span class="legend-price">Not available</span>
+                </div>
+                <div class="legend-row">
+                    <span class="seat-swatch selected"></span>
+                    <span class="legend-label">Your selection</span>
+                    <span class="legend-price">&nbsp;</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="seatmap-plane-panel">
+            <div class="seatmap-plane" id="seatmapPlane">
+                <div class="seatmap-col-headers">
+                    <span>A</span><span>B</span><span>C</span>
+                    <span class="seatmap-col-aisle"></span>
+                    <span>D</span><span>E</span><span>F</span>
+                </div>
+
+                <% let _prevClass = null; %>
+                <% rowNumbers.forEach(rowNum => {
+                    const row = rowsMap[rowNum];
+                    const rowClass = classOfRow(rowNum);
+                    if (rowClass !== _prevClass) {
+                        _prevClass = rowClass;
+                        const extra = extraFor(rowClass);
+                        const priceLabel = rowClass === 'economy'
+                            ? 'Included'
+                            : '+' + fmtSgd(extra) + ' per seat';
+                %>
+                <div class="seatmap-divider seatmap-divider--<%= rowClass %>">
+                    <span class="seatmap-divider-label"><%= CLASS_LABEL[rowClass] %></span>
+                    <span class="seatmap-divider-price"><%= priceLabel %></span>
+                </div>
+                <% } %>
+                <div class="seatmap-row">
+                    <% LETTERS.forEach((letter, idx) => {
+                        const seat = row[letter];
+                        if (!seat) { %>
+                            <div class="seatmap-gap"></div>
+                        <% } else {
+                            const isMine = _preSelected.includes(seat.seat_number);
+                    %>
+                        <button type="button"
+                                class="seat-btn <%= seat.seat_class %> <%= seat.taken ? 'taken' : '' %> <%= isMine ? 'selected' : '' %>"
+                                data-seat="<%= seat.seat_number %>"
+                                data-class="<%= seat.seat_class %>"
+                                <%= seat.taken ? 'disabled' : '' %>
+                                title="<%= seat.seat_number %> (<%= CLASS_LABEL[seat.seat_class] || seat.seat_class %>)">
+                            <%= seat.seat_number %>
+                        </button>
+                        <% if (idx === 2) { %>
+                            <div class="seatmap-aisle"><span class="seatmap-row-num"><%= rowNum %></span></div>
+                        <% } %>
+                    <% } }); %>
+                </div>
+                <% }); %>
+            </div>
+        </div>
+    </div>
+
+    <div class="seatmap-selected-summary" id="seatmapSelectedSummary">
+        <span id="seatmapSelectedText">No seats selected yet</span>
+    </div>
+    <div id="seatmapHiddenInputs"></div>
+</div>
+
+<style>
+:root {
+    --sm-navy: #0f2440;
+    --sm-blue-900: #1e3a5f;
+    --sm-blue-700: #2563eb;
+    --sm-blue-500: #3b82f6;
+    --sm-blue-200: #bfdbfe;
+    --sm-blue-100: #dbeafe;
+    --sm-slate-50: #f8fafc;
+    --sm-slate-100: #eef2f7;
+    --sm-slate-200: #dde3ea;
+    --sm-slate-300: #c7cfd9;
+    --sm-slate-400: #9aa5b3;
+    --sm-slate-600: #5b6577;
+    --sm-slate-700: #3f4959;
+}
+
+.seatmap-wrap { margin-top: 12px; font-family: inherit; }
+
+.seatmap-banner {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--sm-slate-50);
+    border: 1px solid var(--sm-slate-200);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    color: var(--sm-slate-700);
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.seatmap-banner.has-selection {
+    background: var(--sm-blue-100);
+    border-color: var(--sm-blue-200);
+    color: var(--sm-blue-900);
+}
+.seatmap-banner-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--sm-slate-300); color: #fff; font-size: 0.7rem; flex-shrink: 0;
+}
+.seatmap-banner.has-selection .seatmap-banner-icon { background: var(--sm-blue-700); }
+
+.seatmap-container {
+    display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;
+}
+
+/* ---- Legend panel ---- */
+.seatmap-legend-panel {
+    flex: 1 1 220px; min-width: 210px;
+    background: var(--sm-slate-50);
+    border: 1px solid var(--sm-slate-200);
+    border-radius: 14px;
+    padding: 18px;
+}
+.seatmap-legend-list { display: flex; flex-direction: column; gap: 14px; }
+.legend-row { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
+.legend-label { color: var(--sm-slate-700); font-weight: 600; flex: 1; }
+.legend-price { color: var(--sm-slate-600); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.seat-swatch {
+    width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+    border: 1px solid rgba(15, 36, 64, 0.12);
+}
+.seat-swatch.economy { background: var(--sm-slate-100); border-color: var(--sm-slate-300); }
+.seat-swatch.business { background: var(--sm-blue-500); }
+.seat-swatch.first { background: var(--sm-navy); }
+.seat-swatch.taken { background: var(--sm-slate-300); }
+.seat-swatch.selected {
+    background: var(--sm-blue-700);
+    position: relative;
+}
+.seat-swatch.selected::after {
+    content: "✓"; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.75rem; font-weight: 700;
+}
+
+/* ---- Plane panel ---- */
+.seatmap-plane-panel {
+    position: relative;
+    flex: 2 1 320px;
+    background: linear-gradient(180deg, #ffffff 0%, var(--sm-slate-50) 100%);
+    border: 1px solid var(--sm-slate-200);
+    border-radius: 36px 36px 20px 20px;
+    padding: 22px 18px 26px;
+    overflow-x: auto;
+    box-shadow: 0 1px 2px rgba(15, 36, 64, 0.04);
+}
+.seatmap-plane-panel::before {
+    content: "";
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    width: 64px; height: 22px;
+    background: var(--sm-slate-100);
+    border: 1px solid var(--sm-slate-200);
+    border-bottom: none;
+    border-radius: 32px 32px 0 0;
+}
+
+.seatmap-plane { display: flex; flex-direction: column; gap: 8px; min-width: 300px; }
+
+.seatmap-col-headers {
+    display: grid;
+    grid-template-columns: repeat(3, 40px) 34px repeat(3, 40px);
+    gap: 6px;
+    justify-items: center;
+    font-size: 0.75rem; font-weight: 700; color: var(--sm-slate-400);
+    letter-spacing: 0.03em;
+    padding-bottom: 4px;
+}
+
+.seatmap-divider {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 6px 0 2px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.seatmap-divider--economy { background: var(--sm-slate-100); color: var(--sm-slate-600); }
+.seatmap-divider--business { background: var(--sm-blue-100); color: var(--sm-blue-900); }
+.seatmap-divider--first { background: var(--sm-navy); color: #fff; }
+
+.seatmap-row {
+    display: grid;
+    grid-template-columns: repeat(3, 40px) 34px repeat(3, 40px);
+    gap: 6px;
+    align-items: center;
+    justify-items: center;
+}
+.seatmap-gap { width: 40px; height: 36px; }
+.seatmap-aisle {
+    width: 34px; display: flex; align-items: center; justify-content: center;
+}
+.seatmap-row-num { font-size: 0.72rem; font-weight: 700; color: var(--sm-slate-400); }
+
+.seat-btn {
+    width: 40px; height: 36px;
+    border-radius: 9px; border: 1px solid rgba(15, 36, 64, 0.1);
+    font-size: 0.68rem; cursor: pointer; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--sm-slate-700);
+    transition: transform 0.08s ease, box-shadow 0.15s ease;
+}
+.seat-btn:hover:not(.taken):not(.selected) { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15, 36, 64, 0.12); }
+
+.seat-btn.economy { background: var(--sm-slate-100); }
+.seat-btn.business { background: var(--sm-blue-200); color: var(--sm-blue-900); }
+.seat-btn.first { background: var(--sm-navy); color: #fff; border-color: var(--sm-navy); }
+
+.seat-btn.taken { background: var(--sm-slate-300); color: var(--sm-slate-500); cursor: not-allowed; opacity: 0.7; }
+
+.seat-btn.selected {
+    background: var(--sm-blue-700) !important;
+    color: #fff !important;
+    border-color: var(--sm-blue-900);
+    box-shadow: 0 0 0 2px var(--sm-blue-200);
+}
+
+.seatmap-selected-summary {
+    margin-top: 14px;
+    font-size: 0.9rem; font-weight: 600;
+    color: var(--sm-slate-700);
+    background: var(--sm-slate-50);
+    border: 1px solid var(--sm-slate-200);
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+@media (max-width: 640px) {
+    .seatmap-container { flex-direction: column; }
+    .seatmap-legend-panel { width: 100%; }
+}
+</style>
+
+<script>
+(function () {
+    const plane = document.getElementById('seatmapPlane');
+    const hiddenInputsContainer = document.getElementById('seatmapHiddenInputs');
+    const summaryText = document.getElementById('seatmapSelectedText');
+    const banner = document.getElementById('seatmapBanner');
+    const bannerText = document.getElementById('seatmapBannerText');
+
+    let selectedSeats = <%- JSON.stringify(_preSelected) %>;
+
+    // Pages that let the passenger count change (book.ejs) can set
+    // window.getMaxSelectableSeats = () => <current count>; otherwise it's fixed.
+    function getMax() {
+        if (typeof window.getMaxSelectableSeats === 'function') {
+            return window.getMaxSelectableSeats();
+        }
+        return <%= _maxSeats %>;
+    }
+
+    function renderHiddenInputs() {
+        hiddenInputsContainer.innerHTML = '';
+        selectedSeats.forEach(seatNum => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'seat_numbers[]';
+            input.value = seatNum;
+            hiddenInputsContainer.appendChild(input);
+        });
+    }
+
+    function renderSummary() {
+        const max = getMax();
+        if (selectedSeats.length === 0) {
+            summaryText.textContent = `No seats selected yet - choose ${max} seat(s).`;
+            bannerText.textContent = "You haven't selected a seat yet";
+            banner.classList.remove('has-selection');
+        } else {
+            summaryText.textContent = `Selected (${selectedSeats.length}/${max}): ${selectedSeats.join(', ')}`;
+            bannerText.textContent = `Seat${selectedSeats.length > 1 ? 's' : ''} selected: ${selectedSeats.join(', ')}`;
+            banner.classList.add('has-selection');
+        }
+    }
+
+    function refresh() {
+        renderHiddenInputs();
+        renderSummary();
+    }
+
+    plane.addEventListener('click', function (e) {
+        const btn = e.target.closest('.seat-btn');
+        if (!btn || btn.disabled) return;
+
+        const seatNum = btn.dataset.seat;
+        const max = getMax();
+
+        if (selectedSeats.includes(seatNum)) {
+            selectedSeats = selectedSeats.filter(s => s !== seatNum);
+            btn.classList.remove('selected');
+        } else {
+            if (selectedSeats.length >= max) {
+                alert(`You can only select ${max} seat(s) for ${max} passenger(s). Deselect one first, or add another passenger.`);
+                return;
+            }
+            selectedSeats.push(seatNum);
+            btn.classList.add('selected');
+        }
+        refresh();
+    });
+
+    // Exposed so the page's "add/remove passenger" JS can trim selection
+    // down if the passenger count drops below the number of picked seats.
+    window.seatmapTrimToMax = function () {
+        const max = getMax();
+        while (selectedSeats.length > max) {
+            const removed = selectedSeats.pop();
+            const btn = plane.querySelector(`.seat-btn[data-seat="${removed}"]`);
+            if (btn) btn.classList.remove('selected');
+        }
+        refresh();
+    };
+    window.seatmapRefreshSummary = refresh;
+
+    refresh();
+})();
+</script>

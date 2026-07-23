@@ -10,32 +10,126 @@
     <div class="container">
         <%- include('partials/flash') %>
 
-        <div class="card">
-            <h2>Edit Booking - <%= booking.flight_number %></h2>
-            <p class="meta"><%= booking.origin %> → <%= booking.destination %></p>
-            <p class="meta">Seats currently available on this flight: <strong><%= booking.available_seats %></strong> (excludes this booking)</p>
+        <div class="card boarding-card">
+            <div class="boarding-top">
+                <div class="bp-route">
+                    <div class="bp-airport">
+                        <div class="code"><%= booking.origin %></div>
+                    </div>
+                    <div class="bp-route-line">
+                        <span class="bp-dot"></span>
+                        <span class="line"></span>
+                        <span class="plane">✈</span>
+                        <span class="line"></span>
+                        <span class="bp-dot"></span>
+                    </div>
+                    <div class="bp-airport right">
+                        <div class="code"><%= booking.destination %></div>
+                    </div>
+                </div>
+            </div>
+            <div class="boarding-meta-row">
+                <div class="item">
+                    <div class="label">Flight</div>
+                    <div class="value"><%= booking.flight_number %></div>
+                </div>
+                <div class="item">
+                    <div class="label">Base Price</div>
+                    <div class="value">S$<%= Number(booking.price).toFixed(2) %></div>
+                </div>
+                <div class="item">
+                    <div class="label">Seats Left</div>
+                    <div class="value"><%= booking.available_seats %></div>
+                </div>
+            </div>
+        </div>
 
-            <form action="/bookings/edit/<%= booking.id %>" method="POST">
+        <form action="/bookings/edit/<%= booking.id %>" method="POST" id="editBookingForm">
+            <div class="card" style="margin-top:16px;">
+                <h2 style="margin-top:0;">Passenger Details</h2>
                 <div class="field">
-                    <label for="passenger_name">Passenger Full Name</label>
+                    <label for="passenger_name">Passenger Full Name(s)</label>
                     <input type="text" id="passenger_name" name="passenger_name" value="<%= booking.passenger_name %>" required>
                 </div>
-                <div class="field">
-                    <label for="passenger_count">Number of Passengers</label>
-                    <input type="number" id="passenger_count" name="passenger_count" min="1" value="<%= booking.passenger_count %>" required>
+                <p class="meta" style="margin-top:8px;">
+                    Passenger count is set by how many seats you select below - currently
+                    <strong><span id="editPassengerCount"><%= booking.passenger_count %></span></strong>.
+                </p>
+            </div>
+
+            <div class="card" style="margin-top:16px;">
+                <h2 style="margin-top:0;">Select Your Seat(s)</h2>
+                <p class="meta">Your current seat(s) are shown as selected. Pick a different number of seats to add or remove passengers.</p>
+                <%- include('partials/seatmap', {
+                    seatMap: seatMap,
+                    preSelected: booking.seat_numbers ? booking.seat_numbers.split(',').map(s => s.trim()) : [],
+                    maxSeats: 99,
+                    basePrice: booking.price
+                }) %>
+            </div>
+
+            <div class="card" id="editSummary" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div class="label">Passengers</div>
+                    <div class="value" id="summaryPassengerCount"><%= booking.passenger_count %></div>
                 </div>
-                <div class="field">
-                    <label for="seat_class">Seat Class</label>
-                    <select id="seat_class" name="seat_class">
-                        <option value="economy" <%= booking.seat_class === 'economy' ? 'selected' : '' %>>Economy (x1 price)</option>
-                        <option value="business" <%= booking.seat_class === 'business' ? 'selected' : '' %>>Business (x2 price)</option>
-                        <option value="first" <%= booking.seat_class === 'first' ? 'selected' : '' %>>First Class (x3 price)</option>
-                    </select>
+                <div style="text-align:right;">
+                    <div class="label">Total Price</div>
+                    <div class="value" id="summaryTotalPrice">S$<%= Number(booking.total_price).toFixed(2) %></div>
                 </div>
-                <button type="submit" class="btn">Save Changes</button>
-                <a class="btn" style="background:var(--muted);" href="/my-bookings">Cancel</a>
-            </form>
-        </div>
+            </div>
+
+            <button type="submit" class="btn" style="margin-top:16px;width:100%;">Save Changes</button>
+            <a class="btn" style="background:var(--muted);margin-top:8px;width:100%;text-align:center;display:block;" href="/my-bookings">Cancel</a>
+        </form>
     </div>
+
+<script>
+const BASE_PRICE = <%= Number(booking.price) %>;
+// Same flat SGD surcharges as SEAT_SURCHARGE in app.js / seatmap.ejs.
+const SEAT_SURCHARGE = { economy: 0, business: 79.80, first: 138.80 };
+
+// Unlike book.ejs, there's no fixed passenger-count field here - the
+// number of seats selected on the map *is* the passenger count. So the
+// map has no fixed max (see maxSeats: 99 above); this just relabels totals.
+function refreshEditSummary() {
+    const hiddenInputs = document.querySelectorAll('#seatmapHiddenInputs input');
+    const count = hiddenInputs.length;
+
+    // Figure out which class the selected seats belong to, by reading the
+    // data-class of each matching seat button (all selections should share
+    // one class - the server enforces this too).
+    let seatClass = 'economy';
+    if (count > 0) {
+        const firstSeat = hiddenInputs[0].value;
+        const btn = document.querySelector(`.seat-btn[data-seat="${firstSeat}"]`);
+        if (btn) seatClass = btn.dataset.class;
+    }
+
+    const surcharge = SEAT_SURCHARGE[seatClass] || 0;
+    const total = count * (BASE_PRICE + surcharge);
+
+    document.getElementById('summaryPassengerCount').textContent = count;
+    document.getElementById('editPassengerCount').textContent = count;
+    document.getElementById('summaryTotalPrice').textContent = 'S$' + total.toFixed(2);
+}
+
+// The seatmap partial calls this after every click via a MutationObserver-free
+// approach: we just watch clicks on the plane directly.
+document.getElementById('seatmapPlane').addEventListener('click', function () {
+    // Let the seatmap partial's own click handler run first, then refresh.
+    setTimeout(refreshEditSummary, 0);
+});
+
+document.getElementById('editBookingForm').addEventListener('submit', function (e) {
+    const picked = document.querySelectorAll('#seatmapHiddenInputs input').length;
+    if (picked < 1) {
+        e.preventDefault();
+        alert('Please select at least one seat.');
+    }
+});
+
+refreshEditSummary();
+</script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+
 const express = require('express');
 const mysql = require('mysql2');
 const session = require('express-session');
@@ -42,6 +43,35 @@ db.connect((err) => {
             console.log('bookings.status column is ready.');
         }
     });
+
+    db.query('ALTER TABLE bookings ADD COLUMN seat_numbers VARCHAR(255) NULL', (err) => {
+        if (err) {
+            if (err.code === 'ER_DUP_FIELDNAME') {
+                console.log('seat_numbers column already exists - skipping.');
+            } else {
+                console.error('Could not add bookings.seat_numbers column:', err.message);
+            }
+        } else {
+            console.log('seat_numbers column added.');
+        }
+    });
+
+    db.query(`CREATE TABLE IF NOT EXISTS seats (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        flight_id INT NOT NULL,
+        seat_number VARCHAR(5) NOT NULL,
+        seat_class VARCHAR(20) NOT NULL,
+        booking_id INT NULL,
+        UNIQUE KEY uniq_flight_seat (flight_id, seat_number),
+        FOREIGN KEY (flight_id) REFERENCES flights(id) ON DELETE CASCADE,
+        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL
+    )`, (err) => {
+        if (err) {
+            console.error('Could not ensure seats table:', err.message);
+        } else {
+            console.log('seats table is ready.');
+        }
+    });
 });
  
 // ============================================================
@@ -71,11 +101,12 @@ app.use((req, res, next) => {
     next();
 });
  
-// Seat-class price multiplier - the core of the booking price enhancement.
-// economy = base price, business = 2x, first = 3x.
-const CLASS_MULTIPLIER = { economy: 1, business: 2, first: 3 };
-function getMultiplier(seatClass) {
-    return CLASS_MULTIPLIER[seatClass] || 1;
+// Seat-class price surcharge (flat, in SGD) - the core of the booking price enhancement.
+// economy = no additional charge, business = +S$79.80/seat, first = +S$138.80/seat.
+// Keep this in sync with SEAT_SURCHARGE in views/partials/seatmap.ejs.
+const SEAT_SURCHARGE = { economy: 0, business: 79.80, first: 138.80 };
+function getSeatSurcharge(seatClass) {
+    return SEAT_SURCHARGE[seatClass] || 0;
 }
 
 // Maps the `fare` radio value from book.ejs to a seat class + per-person
@@ -89,6 +120,56 @@ const FARE_INFO = {
 };
 function getFareInfo(fare) {
     return FARE_INFO[fare] || { seatClass: 'economy', multiplier: 1 };
+}
+
+// ---------- Seat map helpers ----------
+// 6 seats per row (A-F). First 2 rows = first class, next 3 rows = business,
+// remainder = economy. Adjust ratios here if your seat counts change.
+const SEAT_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+function classForRow(rowNumber, totalRows) {
+    const firstRows = Math.max(1, Math.round(totalRows * 0.1));
+    const businessRows = Math.max(1, Math.round(totalRows * 0.2));
+    if (rowNumber <= firstRows) return 'first';
+    if (rowNumber <= firstRows + businessRows) return 'business';
+    return 'economy';
+}
+
+// Generates and inserts seat rows for a newly created flight.
+function generateSeatsForFlight(flightId, totalSeats, callback) {
+    const totalRows = Math.ceil(totalSeats / SEAT_LETTERS.length);
+    const seatRows = [];
+    let seatsLeft = totalSeats;
+
+    for (let row = 1; row <= totalRows && seatsLeft > 0; row++) {
+        const seatClass = classForRow(row, totalRows);
+        for (let i = 0; i < SEAT_LETTERS.length && seatsLeft > 0; i++) {
+            seatRows.push([flightId, `${row}${SEAT_LETTERS[i]}`, seatClass, null]);
+            seatsLeft--;
+        }
+    }
+
+    if (seatRows.length === 0) return callback(null);
+
+    const sql = 'INSERT INTO seats (flight_id, seat_number, seat_class, booking_id) VALUES ?';
+    db.query(sql, [seatRows], callback);
+}
+
+// Fetches the full seat map for a flight, each seat flagged with whether
+// it's taken, and (if editing) whether it belongs to the current booking.
+function getSeatMap(flightId, currentBookingId, callback) {
+    const sql = 'SELECT * FROM seats WHERE flight_id = ? ORDER BY seat_number';
+    db.query(sql, [flightId], (err, seats) => {
+        if (err) return callback(err);
+        const seatMap = seats.map(s => ({
+            ...s,
+            row: parseInt(s.seat_number, 10),
+            letter: s.seat_number.replace(/[0-9]/g, ''),
+            taken: !!s.booking_id && s.booking_id !== currentBookingId,
+            mine: !!currentBookingId && s.booking_id === currentBookingId
+        }));
+        callback(null, seatMap);
+    });
 }
  
 // ============================================================
@@ -251,7 +332,10 @@ app.get('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
             req.flash('error', 'Flight not found.');
             return res.redirect('/dashboard');
         }
-        res.render('book', { flight: results[0] });
+        getSeatMap(req.params.flightId, null, (err, seatMap) => {
+            if (err) throw err;
+            res.render('book', { flight: results[0], seatMap });
+        });
     });
 });
  
@@ -275,6 +359,7 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     // passenger_name[] only exists for extra passengers added via the template.
     const extraNames   = asArray(req.body.passenger_name);
     const fare         = req.body.fare;
+    const seatNumbers  = asArray(req.body.seat_numbers).filter(s => s && s.trim());
 
     const mainOk = firstNames[0] && lastNames[0] && genders[0] && emails[0] && passports[0] && dobs[0] && numbers[0];
     if (!mainOk || !fare) {
@@ -285,6 +370,11 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     // Total passenger count = the main passenger + however many extra
     // passenger blocks were added and actually filled in.
     const passengerCount = 1 + extraNames.filter(n => n && n.trim()).length;
+
+    if (seatNumbers.length !== passengerCount) {
+        req.flash('error', `Please select exactly ${passengerCount} seat(s) - one per passenger.`);
+        return res.redirect(`/book/${flightId}`);
+    }
 
     // Build one readable name string to store in the single passenger_name column.
     const allNames = [`${firstNames[0]} ${lastNames[0]}`, ...extraNames.filter(n => n && n.trim())];
@@ -307,21 +397,40 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
             req.flash('error', `Only ${flight.available_seats} seat(s) left on this flight.`);
             return res.redirect(`/book/${flightId}`);
         }
- 
-        // Total = base price x number of passengers x fare multiplier.
-        const totalPrice = flight.price * passengerCount * multiplier;
- 
-        const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, status)
-                            VALUES (?, ?, ?, ?, ?, ?, 'confirmed')`;
-        db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice], (err) => {
+
+        // Confirm the chosen seats are still free right now (another
+        // customer may have grabbed one since the page was loaded).
+        const seatCheckSql = 'SELECT seat_number FROM seats WHERE flight_id = ? AND seat_number IN (?) AND booking_id IS NOT NULL';
+        db.query(seatCheckSql, [flightId, seatNumbers], (err, takenRows) => {
             if (err) throw err;
- 
-            // Enhancement: decrement available seats after a successful booking.
-            const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
-            db.query(updateSeatsSql, [passengerCount, flightId], (err) => {
+            if (takenRows.length > 0) {
+                req.flash('error', `Seat(s) ${takenRows.map(r => r.seat_number).join(', ')} were just taken. Please pick again.`);
+                return res.redirect(`/book/${flightId}`);
+            }
+
+            // Total = base price x number of passengers x fare multiplier.
+            const totalPrice = flight.price * passengerCount * multiplier;
+
+            const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, seat_numbers, status)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`;
+            db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice, seatNumbers.join(', ')], (err, insertResult) => {
                 if (err) throw err;
-                req.flash('success', 'Flight booked successfully!');
-                res.redirect('/my-bookings');
+
+                const bookingId = insertResult.insertId;
+
+                // Claim the seats for this booking.
+                const claimSeatsSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
+                db.query(claimSeatsSql, [bookingId, flightId, seatNumbers], (err) => {
+                    if (err) throw err;
+
+                    // Enhancement: decrement available seats after a successful booking.
+                    const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
+                    db.query(updateSeatsSql, [passengerCount, flightId], (err) => {
+                        if (err) throw err;
+                        req.flash('success', 'Flight booked successfully!');
+                        res.redirect('/my-bookings');
+                    });
+                });
             });
         });
     });
@@ -348,7 +457,7 @@ app.get('/my-bookings', checkAuthenticated, checkCustomer, (req, res) => {
 // ---------- Student D: Edit booking (+ seat inventory adjustment) ----------
  
 app.get('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
-    const sql = `SELECT bookings.*, flights.flight_number, flights.origin, flights.destination,
+    const sql = `SELECT bookings.*, flights.id AS flight_id, flights.flight_number, flights.origin, flights.destination,
                         flights.price, flights.available_seats
                  FROM bookings JOIN flights ON bookings.flight_id = flights.id
                  WHERE bookings.id = ? AND bookings.user_id = ?`;
@@ -364,18 +473,25 @@ app.get('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
             req.flash('error', 'This booking cannot be edited.');
             return res.redirect('/my-bookings');
         }
- 
-        res.render('edit-booking', { booking });
+
+        // Seats already belonging to this booking show as "mine" (selectable/
+        // deselectable) rather than "taken", everyone else's seats show as taken.
+        getSeatMap(booking.flight_id, booking.id, (err, seatMap) => {
+            if (err) throw err;
+            res.render('edit-booking', { booking, seatMap });
+        });
     });
 });
  
 app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
     const bookingId = req.params.id;
-    const { passenger_name, seat_class } = req.body;
-    const newCount = parseInt(req.body.passenger_count, 10);
+    const { passenger_name } = req.body;
+    const asArray = (val) => (val === undefined ? [] : (Array.isArray(val) ? val : [val]));
+    const seatNumbers = asArray(req.body.seat_numbers).filter(s => s && s.trim());
+    const newCount = seatNumbers.length;
  
-    if (!passenger_name || !newCount || newCount < 1) {
-        req.flash('error', 'Please provide valid passenger details.');
+    if (!passenger_name || newCount < 1) {
+        req.flash('error', 'Please provide a passenger name and select at least one seat.');
         return res.redirect(`/bookings/edit/${bookingId}`);
     }
  
@@ -402,20 +518,53 @@ app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => 
             req.flash('error', 'Not enough seats available for this change.');
             return res.redirect(`/bookings/edit/${bookingId}`);
         }
- 
-        const newTotalPrice = booking.price * newCount * getMultiplier(seat_class);
- 
-        const updateBookingSql = `UPDATE bookings SET passenger_name = ?, passenger_count = ?, seat_class = ?, total_price = ?
-                                   WHERE id = ?`;
-        db.query(updateBookingSql, [passenger_name, newCount, seat_class, newTotalPrice, bookingId], (err) => {
+
+        // Make sure every selected seat is either free, or already this booking's own seat.
+        const seatCheckSql = `SELECT seat_number, seat_class FROM seats
+                               WHERE flight_id = ? AND seat_number IN (?)
+                               AND (booking_id IS NULL OR booking_id = ?)`;
+        db.query(seatCheckSql, [booking.flight_id, seatNumbers, bookingId], (err, freeRows) => {
             if (err) throw err;
+            if (freeRows.length !== seatNumbers.length) {
+                req.flash('error', 'One or more selected seats are no longer available. Please pick again.');
+                return res.redirect(`/bookings/edit/${bookingId}`);
+            }
+
+            // All selected seats must share the same class, since a booking
+            // stores one seat_class for the whole group.
+            const classesUsed = [...new Set(freeRows.map(r => r.seat_class))];
+            if (classesUsed.length > 1) {
+                req.flash('error', 'Please select seats from a single class (Economy, Business, or First) only.');
+                return res.redirect(`/bookings/edit/${bookingId}`);
+            }
+            const seatClass = classesUsed[0];
  
-            // Enhancement: adjust the flight's available seats by the delta.
-            const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
-            db.query(updateSeatsSql, [seatDelta, booking.flight_id], (err) => {
+            // Each passenger pays the flight's base price plus a flat surcharge for their seat class.
+            const newTotalPrice = newCount * (booking.price + getSeatSurcharge(seatClass));
+ 
+            const updateBookingSql = `UPDATE bookings SET passenger_name = ?, passenger_count = ?, seat_class = ?, total_price = ?, seat_numbers = ?
+                                       WHERE id = ?`;
+            db.query(updateBookingSql, [passenger_name, newCount, seatClass, newTotalPrice, seatNumbers.join(', '), bookingId], (err) => {
                 if (err) throw err;
-                req.flash('success', 'Booking updated successfully!');
-                res.redirect('/my-bookings');
+
+                // Release this booking's old seats, then claim the newly selected ones.
+                const releaseSql = 'UPDATE seats SET booking_id = NULL WHERE booking_id = ?';
+                db.query(releaseSql, [bookingId], (err) => {
+                    if (err) throw err;
+
+                    const claimSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
+                    db.query(claimSql, [bookingId, booking.flight_id, seatNumbers], (err) => {
+                        if (err) throw err;
+
+                        // Enhancement: adjust the flight's available seats by the delta.
+                        const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
+                        db.query(updateSeatsSql, [seatDelta, booking.flight_id], (err) => {
+                            if (err) throw err;
+                            req.flash('success', 'Booking updated successfully!');
+                            res.redirect('/my-bookings');
+                        });
+                    });
+                });
             });
         });
     });
@@ -446,12 +595,17 @@ app.post('/bookings/delete/:id', checkAuthenticated, checkCustomer, (req, res) =
  
         db.query('UPDATE bookings SET status = ?, cancelled_by = ? WHERE id = ?', ['cancelled', 'customer', bookingId], (err) => {
             if (err) throw err;
- 
-            const restoreSeatsSql = 'UPDATE flights SET available_seats = available_seats + ? WHERE id = ?';
-            db.query(restoreSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
+
+            const releaseSeatsSql = 'UPDATE seats SET booking_id = NULL WHERE booking_id = ?';
+            db.query(releaseSeatsSql, [bookingId], (err) => {
                 if (err) throw err;
-                req.flash('success', 'Booking cancelled and seats released.');
-                res.redirect('/my-bookings');
+
+                const restoreSeatsSql = 'UPDATE flights SET available_seats = available_seats + ? WHERE id = ?';
+                db.query(restoreSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
+                    if (err) throw err;
+                    req.flash('success', 'Booking cancelled and seats released.');
+                    res.redirect('/my-bookings');
+                });
             });
         });
     });
@@ -503,13 +657,13 @@ app.post('/admin/flights/add', checkAuthenticated, checkAdmin, (req, res) => {
     }
  
     if (parseFloat(price) < 50 || parseInt(total_seats, 10) < 1) {
-        req.flash('error', 'Price must be at least $50 and seats at least 1.');
+        req.flash('error', 'Price must be at least S$50 and seats at least 1.');
         return res.redirect('/admin/flights/add');
     }
  
     const sql = `INSERT INTO flights (flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, available_seats)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    db.query(sql, [flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, total_seats], (err) => {
+    db.query(sql, [flight_number, airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, total_seats], (err, result) => {
         if (err) {
             if (err.code === 'ER_DUP_ENTRY') {
                 req.flash('error', 'That flight number already exists.');
@@ -517,8 +671,11 @@ app.post('/admin/flights/add', checkAuthenticated, checkAdmin, (req, res) => {
             }
             throw err;
         }
-        req.flash('success', 'Flight added successfully!');
-        res.redirect('/admin');
+        generateSeatsForFlight(result.insertId, parseInt(total_seats, 10), (err) => {
+            if (err) console.error('Could not generate seats for flight:', err.message);
+            req.flash('success', 'Flight added successfully!');
+            res.redirect('/admin');
+        });
     });
 });
  
@@ -622,4 +779,4 @@ app.get("/book/:id", (req, res) => {
 // Starting the server
 app.listen(3000, () => {
     console.log('SkyWings server started on http://localhost:3000');
-});
+}); 
