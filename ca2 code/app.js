@@ -71,7 +71,6 @@ db.connect((err) => {
             console.log('seats table is ready.');
         }
     });
-<<<<<<< HEAD
 
     // Enhancement: profile page fields (display name, gender, region).
     // Added one at a time with the same "skip if it already exists" pattern
@@ -94,8 +93,6 @@ db.connect((err) => {
             }
         });
     });
-=======
->>>>>>> 0317d44f60a33e544c0a83a48cfde56942ce7357
 });
 
 app.use(express.urlencoded({ extended: false }));
