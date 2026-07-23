@@ -591,7 +591,7 @@ app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => 
             const seatClass = classesUsed[0];
  
             // Each passenger pays the flight's base price plus a flat surcharge for their seat class.
-            const newTotalPrice = newCount * (booking.price + getSeatSurcharge(seatClass));
+            const newTotalPrice = newCount * (parseFloat(booking.price) + getSeatSurcharge(seatClass));
  
             const updateBookingSql = `UPDATE bookings SET passenger_name = ?, passenger_count = ?, seat_class = ?, total_price = ?, seat_numbers = ?
                                        WHERE id = ?`;
