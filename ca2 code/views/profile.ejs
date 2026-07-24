@@ -21,6 +21,7 @@
             <div class="form-card">
                 <h1>My Profile</h1>
 
+                <form action="/profile" method="POST">
                 <div class="field">
                     <label>Username</label>
                     <input type="text" value="<%= user.username %>" readonly>
@@ -99,6 +100,7 @@
 
             <a class="btn" style="background:var(--muted); margin-top:12px; display:inline-block;"
                href="<%= profileUser.role === 'admin' ? '/admin' : '/dashboard' %>">Back to Dashboard</a>
+        <% } %>
         </div>
     </div>
 </body>
