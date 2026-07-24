@@ -86,6 +86,34 @@
                 <button type="submit" class="btn btn-accent" style="margin-top:8px;">Save Changes</button>
             </form>
 
+            <hr class="bp-divider" style="margin:22px 0;">
+
+            <h2 style="margin-top:0;">Feedback</h2>
+            <p class="meta" style="margin-top:-6px;">Let us know how we're doing or suggest an improvement.</p>
+
+            <form action="/profile/feedback" method="POST">
+                <div class="field">
+                    <label for="feedback_message">Your feedback</label>
+                    <textarea id="feedback_message" name="message" rows="4"
+                              placeholder="Tell us what you think..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-accent" style="margin-top:8px;">Submit Feedback</button>
+            </form>
+
+            <% if (feedbackList && feedbackList.length > 0) { %>
+                <h2 style="margin-top:24px;">Your previous feedback</h2>
+                <div class="feedback-list">
+                    <% feedbackList.forEach(function(fb) { %>
+                        <div class="card" style="margin-top:10px; padding:14px;">
+                            <p style="margin:0;"><%= fb.message %></p>
+                            <p class="meta" style="margin:6px 0 0;">
+                                <%= new Date(fb.created_at).toLocaleString() %>
+                            </p>
+                        </div>
+                    <% }) %>
+                </div>
+            <% } %>
+
             <a class="btn" style="background:var(--muted); margin-top:12px; display:inline-block;"
                href="<%= profileUser.role === 'admin' ? '/admin' : '/dashboard' %>">Back to Dashboard</a>
         </div>

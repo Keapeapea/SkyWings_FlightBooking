@@ -13,34 +13,38 @@
 <%- include('partials/navbar') %>
 
 <div class="container">
+    <%- include('partials/flash') %>
 
     <div class="form-card">
 
         <h1>Contact Us</h1>
 
-       <form action  <label>Name</label>
-    <input type="text" name="name" required>
+        <form action="/contact-us" method="POST">
+            <div class="field">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" value="<%= user ? (user.display_name || user.username) : '' %>" required>
+            </div>
 
-    <label>Email</label>
-    <input type="email" name="email" required>
+            <div class="field">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="<%= user ? user.email : '' %>" required>
+            </div>
 
-    <label>Message</label>
-    <textarea
-        name="message"
-        rows="5"
-        required></textarea>
+            <div class="field">
+                <label for="message">Message</label>
+                <textarea id="message" name="message" rows="5" required></textarea>
+            </div>
 
-    <button type="submit" class="btn">
-        Send Message
-    </button>
+            <button type="submit" class="btn">
+                Send Message
+            </button>
+        </form>
 
-</form>
+        <p style="margin-top:14px; color:var(--muted);">
+            Need help? Contact our support team anytime.
+        </p>
+    </div>
+</div>
 
-<p style="margin-top:14px; color:var(--muted);">
-    Need help? Contact our support team anytime.
-</p>
-    
-
-
-    
-
+</body>
+</html>

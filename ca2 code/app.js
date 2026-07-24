@@ -93,6 +93,21 @@ db.connect((err) => {
             }
         });
     });
+
+    // Feedback left by users from their profile page.
+    db.query(`CREATE TABLE IF NOT EXISTS feedback (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`, (err) => {
+        if (err) {
+            console.error('Could not ensure feedback table:', err.message);
+        } else {
+            console.log('feedback table is ready.');
+        }
+    });
 });
 
 app.use(express.urlencoded({ extended: false }));
@@ -189,7 +204,7 @@ function getSeatMap(flightId, currentBookingId, callback) {
 }
  
 // ============================================================
-// Student A - Access control middleware
+// Access control middleware
 // ============================================================
  
 const checkAuthenticated = (req, res, next) => {
@@ -268,7 +283,27 @@ app.post('/register', validateRegistration, (req, res) => {
     });
 });
  
-// ---------- Student A: Login / Logout ----------
+// ---------- Contact Us ----------
+
+app.get('/contact-us', (req, res) => {
+    res.render('contact-us');
+});
+
+app.post('/contact-us', (req, res) => {
+    const { name, email, message } = req.body;
+
+    if (!name || !email || !message) {
+        req.flash('error', 'All fields are required.');
+        return res.redirect('/contact-us');
+    }
+
+    // No dedicated "contact messages" table exists yet - for now we just
+    // acknowledge receipt. Swap this out for a real insert if/when one is added.
+    req.flash('success', 'Thanks for reaching out! Our support team will get back to you soon.');
+    res.redirect('/contact-us');
+});
+
+// ---------- Login / Logout ----------
  
 app.get('/login', (req, res) => {
     res.render('login');
@@ -313,7 +348,30 @@ app.get('/profile', checkAuthenticated, (req, res) => {
             req.flash('error', 'User not found.');
             return res.redirect('/');
         }
-        res.render('profile', { profileUser: results[0] });
+
+        const feedbackSql = 'SELECT * FROM feedback WHERE user_id = ? ORDER BY created_at DESC';
+        db.query(feedbackSql, [req.session.user.id], (err, feedbackList) => {
+            if (err) throw err;
+            res.render('profile', { profileUser: results[0], feedbackList });
+        });
+    });
+});
+
+// ---------- Profile: submit feedback ----------
+
+app.post('/profile/feedback', checkAuthenticated, (req, res) => {
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+        req.flash('error', 'Please enter some feedback before submitting.');
+        return res.redirect('/profile');
+    }
+
+    const sql = 'INSERT INTO feedback (user_id, message) VALUES (?, ?)';
+    db.query(sql, [req.session.user.id, message.trim()], (err) => {
+        if (err) throw err;
+        req.flash('success', 'Thanks for your feedback!');
+        res.redirect('/profile');
     });
 });
 
@@ -338,7 +396,7 @@ app.post('/profile', checkAuthenticated, (req, res) => {
 // Customer routes
 // ============================================================
  
-// ---------- Student C + Student F: Browse / Search / Filter / Sort flights ----------
+// ----------  Browse / Search / Filter / Sort flights ----------
  
 app.get('/dashboard', checkAuthenticated, checkCustomer, (req, res) => {
     const { destination, date, sort } = req.query;
@@ -368,7 +426,7 @@ app.get('/dashboard', checkAuthenticated, checkCustomer, (req, res) => {
     });
 });
  
-// ---------- Student B: Create booking (+ seat inventory check) ----------
+// ---------- Create booking (+ seat inventory check) ----------
  
 app.get('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     const sql = 'SELECT * FROM flights WHERE id = ?';
@@ -492,7 +550,7 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
     });
 });
  
-// ---------- Student C: View my bookings ----------
+// ---------- View my bookings ----------
  
 app.get('/my-bookings', checkAuthenticated, checkCustomer, (req, res) => {
     const sql = `SELECT bookings.*,
@@ -510,7 +568,7 @@ app.get('/my-bookings', checkAuthenticated, checkCustomer, (req, res) => {
     });
 });
  
-// ---------- Student D: Edit booking (+ seat inventory adjustment) ----------
+// ---------- Edit booking (+ seat inventory adjustment) ----------
  
 app.get('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => {
     const sql = `SELECT bookings.*, flights.id AS flight_id, flights.flight_number, flights.origin, flights.destination,
@@ -626,7 +684,7 @@ app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => 
     });
 });
  
-// ---------- Student E: Cancel booking (+ seat restore) ----------
+// ---------- Cancel booking (+ seat restore) ----------
  
 app.post('/bookings/delete/:id', checkAuthenticated, checkCustomer, (req, res) => {
     const bookingId = req.params.id;
@@ -671,7 +729,7 @@ app.post('/bookings/delete/:id', checkAuthenticated, checkCustomer, (req, res) =
 // Admin routes
 // ============================================================
  
-// ---------- Student C + Student F: Admin view / search / filter / sort flights ----------
+// ----------Admin view / search / filter / sort flights ----------
  
 app.get('/admin', checkAuthenticated, checkAdmin, (req, res) => {
     const { destination, date, sort } = req.query;
@@ -698,7 +756,7 @@ app.get('/admin', checkAuthenticated, checkAdmin, (req, res) => {
     });
 });
  
-// ---------- Student B: Admin add flight ----------
+// ----------Admin add flight ----------
  
 app.get('/admin/flights/add', checkAuthenticated, checkAdmin, (req, res) => {
     res.render('admin-add-flight');
@@ -735,7 +793,7 @@ app.post('/admin/flights/add', checkAuthenticated, checkAdmin, (req, res) => {
     });
 });
  
-// ---------- Student D: Admin edit flight ----------
+// ---------- Admin edit flight ----------
  
 app.get('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) => {
     const sql = 'SELECT * FROM flights WHERE id = ?';
@@ -776,7 +834,7 @@ app.post('/admin/flights/edit/:id', checkAuthenticated, checkAdmin, (req, res) =
     });
 });
  
-// ---------- Student E: Admin delete flight ----------
+// --------- Admin delete flight ----------
  
 app.post('/admin/flights/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
     const flightId = req.params.id;
@@ -796,7 +854,7 @@ app.post('/admin/flights/delete/:id', checkAuthenticated, checkAdmin, (req, res)
     });
 });
  
-// ---------- Student C: Admin view all bookings ----------
+// ---------- Admin view all bookings ----------
  
 app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
     const sql = `SELECT bookings.*, users.username, users.email,
