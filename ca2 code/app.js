@@ -110,7 +110,7 @@ db.connect((err) => {
     });
 });
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 app.use(session({
