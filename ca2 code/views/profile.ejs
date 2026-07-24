@@ -13,39 +13,22 @@
     <div class="container">
         <%- include('partials/flash') %>
 
-        <div class="card profile-card">
-            <div class="profile-header">
-                <div class="profile-avatar">
-                    <%= (profileUser.display_name || profileUser.username).charAt(0).toUpperCase() %>
-                </div>
-                <div>
-                    <h1 style="margin:0;"><%= profileUser.display_name || profileUser.username %></h1>
-                    <p class="muted-text" style="margin:4px 0 0;"><%= profileUser.email %></p>
-                </div>
+        <% if (!user) { %>
+            <div class="card">
+                <p>Please <a href="/login">log in</a> to view your profile.</p>
             </div>
+        <% } else { %>
+            <div class="form-card">
+                <h1>My Profile</h1>
 
-            <hr class="bp-divider" style="margin:22px 0;">
-
-            <h2 style="margin-top:0;">Account details</h2>
-            <form class="profile-readonly-form">
                 <div class="field">
                     <label>Username</label>
-                    <input type="text" value="<%= profileUser.username %>" disabled>
+                    <input type="text" value="<%= user.username %>" readonly>
                 </div>
+
                 <div class="field">
                     <label>Email</label>
-                    <input type="text" value="<%= profileUser.email %>" disabled>
-                </div>
-            </form>
-
-            <h2>Personal information</h2>
-            <p class="meta" style="margin-top:-6px;">These details are used to personalize your SkyWings experience.</p>
-
-            <form action="/profile" method="POST">
-                <div class="field">
-                    <label for="display_name">Display Name</label>
-                    <input type="text" id="display_name" name="display_name" placeholder="How should we greet you?"
-                           value="<%= profileUser.display_name || '' %>" maxlength="100">
+                    <input type="text" value="<%= user.email %>" readonly>
                 </div>
 
                 <div class="field">

@@ -337,8 +337,8 @@ app.get('/logout', (req, res) => {
         res.redirect('/');
     });
 });
- 
-// ---------- Profile: view / update display name, gender, region ----------
+
+// ---------- Contact Us (public) ----------
 
 app.get('/profile', checkAuthenticated, (req, res) => {
     const sql = 'SELECT * FROM users WHERE id = ?';
@@ -391,12 +391,42 @@ app.post('/profile', checkAuthenticated, (req, res) => {
         res.redirect('/profile');
     });
 });
-
+ 
 // ============================================================
 // Customer routes
 // ============================================================
  
-// ----------  Browse / Search / Filter / Sort flights ----------
+// ---------- One-time backfill: generate seats for flights that predate seat maps ----------
+app.get('/admin/flights/backfill-seats', checkAuthenticated, checkAdmin, (req, res) => {
+    const sql = `SELECT f.id, f.total_seats FROM flights f
+                 LEFT JOIN seats s ON s.flight_id = f.id
+                 WHERE s.id IS NULL
+                 GROUP BY f.id`;
+    db.query(sql, (err, flights) => {
+        if (err) throw err;
+        if (flights.length === 0) {
+            req.flash('success', 'Every flight already has a seat map.');
+            return res.redirect('/admin');
+        }
+
+        let remaining = flights.length;
+        let failed = [];
+
+        flights.forEach(f => {
+            generateSeatsForFlight(f.id, f.total_seats, (err) => {
+                if (err) failed.push(f.id);
+                remaining--;
+                if (remaining === 0) {
+                    req.flash('success', `Backfilled seats for ${flights.length - failed.length} flight(s).` +
+                        (failed.length ? ` Failed: ${failed.join(', ')}` : ''));
+                    res.redirect('/admin');
+                }
+            });
+        });
+    });
+});
+
+// ---------- Student C + Student F: Browse / Search / Filter / Sort flights ----------
  
 app.get('/dashboard', checkAuthenticated, checkCustomer, (req, res) => {
     const { destination, date, sort } = req.query;
@@ -512,37 +542,27 @@ app.post('/book/:flightId', checkAuthenticated, checkCustomer, (req, res) => {
                 return res.redirect(`/book/${flightId}`);
             }
 
-            // Enhancement: pull each selected seat's class so any premium-seat
-            // surcharge (business/first) gets added to the total - previously
-            // this only happened on the edit-booking route.
-            const seatClassSql = 'SELECT seat_number, seat_class FROM seats WHERE flight_id = ? AND seat_number IN (?)';
-            db.query(seatClassSql, [flightId, seatNumbers], (err, seatRows) => {
+            // Total = base price x number of passengers x fare multiplier.
+            const totalPrice = flight.price * passengerCount * multiplier;
+
+            const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, seat_numbers, status)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`;
+            db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice, seatNumbers.join(', ')], (err, insertResult) => {
                 if (err) throw err;
 
-                const seatSurchargeTotal = seatRows.reduce((sum, s) => sum + getSeatSurcharge(s.seat_class), 0);
+                const bookingId = insertResult.insertId;
 
-                // Total = (base price x number of passengers x fare multiplier) + any seat surcharges.
-                const totalPrice = flight.price * passengerCount * multiplier + seatSurchargeTotal;
-
-                const insertSql = `INSERT INTO bookings (user_id, flight_id, passenger_name, passenger_count, seat_class, total_price, seat_numbers, status)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`;
-                db.query(insertSql, [req.session.user.id, flightId, passengerNames, passengerCount, seatClass, totalPrice, seatNumbers.join(', ')], (err, insertResult) => {
+                // Claim the seats for this booking.
+                const claimSeatsSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
+                db.query(claimSeatsSql, [bookingId, flightId, seatNumbers], (err) => {
                     if (err) throw err;
 
-                    const bookingId = insertResult.insertId;
-
-                    // Claim the seats for this booking.
-                    const claimSeatsSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
-                    db.query(claimSeatsSql, [bookingId, flightId, seatNumbers], (err) => {
+                    // Enhancement: decrement available seats after a successful booking.
+                    const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
+                    db.query(updateSeatsSql, [passengerCount, flightId], (err) => {
                         if (err) throw err;
-
-                        // Enhancement: decrement available seats after a successful booking.
-                        const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
-                        db.query(updateSeatsSql, [passengerCount, flightId], (err) => {
-                            if (err) throw err;
-                            req.flash('success', 'Flight booked successfully!');
-                            res.redirect('/my-bookings');
-                        });
+                        req.flash('success', 'Flight booked successfully!');
+                        res.redirect('/my-bookings');
                     });
                 });
             });
@@ -654,7 +674,7 @@ app.post('/bookings/edit/:id', checkAuthenticated, checkCustomer, (req, res) => 
             const seatClass = classesUsed[0];
  
             // Each passenger pays the flight's base price plus a flat surcharge for their seat class.
-            const newTotalPrice = newCount * (booking.price + getSeatSurcharge(seatClass));
+            const newTotalPrice = newCount * (parseFloat(booking.price) + getSeatSurcharge(seatClass));
  
             const updateBookingSql = `UPDATE bookings SET passenger_name = ?, passenger_count = ?, seat_class = ?, total_price = ?, seat_numbers = ?
                                        WHERE id = ?`;
@@ -872,21 +892,123 @@ app.get('/admin/bookings', checkAuthenticated, checkAdmin, (req, res) => {
     });
 });
 
+// ---------- Admin: Cancel any customer's booking (+ seat restore) ----------
+// admin-bookings.ejs posts here for the "Cancel" button - this was referenced
+// in the view but had no matching route.
 
-/* add passenger*/ 
-app.get("/book/:id", (req, res) => {
-    const id = req.params.id;
-    db.query(
-        "SELECT * FROM flights WHERE id = ?",
-        [id],
-        (err, results) => {
-            if (err) throw err;
-            res.render("book", {
-                flight: results[0]
-            });
+app.post('/admin/bookings/delete/:id', checkAuthenticated, checkAdmin, (req, res) => {
+    const bookingId = req.params.id;
+
+    const sql = 'SELECT * FROM bookings WHERE id = ?';
+    db.query(sql, [bookingId], (err, results) => {
+        if (err) throw err;
+        if (results.length === 0) {
+            req.flash('error', 'Booking not found.');
+            return res.redirect('/admin/bookings');
         }
-    );
+
+        const booking = results[0];
+        if (booking.status === 'cancelled') {
+            req.flash('error', 'Booking is already cancelled.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.status === 'flight removed') {
+            req.flash('error', 'This booking can no longer be cancelled because the flight was removed.');
+            return res.redirect('/admin/bookings');
+        }
+
+        db.query('UPDATE bookings SET status = ?, cancelled_by = ? WHERE id = ?', ['cancelled', 'admin', bookingId], (err) => {
+            if (err) throw err;
+
+            const releaseSeatsSql = 'UPDATE seats SET booking_id = NULL WHERE booking_id = ?';
+            db.query(releaseSeatsSql, [bookingId], (err) => {
+                if (err) throw err;
+
+                const restoreSeatsSql = 'UPDATE flights SET available_seats = available_seats + ? WHERE id = ?';
+                db.query(restoreSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
+                    if (err) throw err;
+                    req.flash('success', 'Booking cancelled and seats released.');
+                    res.redirect('/admin/bookings');
+                });
+            });
+        });
+    });
 });
+
+// ---------- Admin: Reactivate a booking the admin previously cancelled ----------
+// admin-bookings.ejs posts here for the "Reactivate" button - this was referenced
+// in the view but had no matching route. Only bookings cancelled by an admin (or
+// with no cancelled_by recorded) can be reactivated here, matching the view's logic;
+// bookings a customer cancelled themselves show "No action" instead.
+
+app.post('/admin/bookings/reactivate/:id', checkAuthenticated, checkAdmin, (req, res) => {
+    const bookingId = req.params.id;
+
+    const sql = `SELECT bookings.*, flights.available_seats
+                 FROM bookings LEFT JOIN flights ON bookings.flight_id = flights.id
+                 WHERE bookings.id = ?`;
+    db.query(sql, [bookingId], (err, results) => {
+        if (err) throw err;
+        if (results.length === 0) {
+            req.flash('error', 'Booking not found.');
+            return res.redirect('/admin/bookings');
+        }
+
+        const booking = results[0];
+        if (booking.status !== 'cancelled') {
+            req.flash('error', 'Only cancelled bookings can be reactivated.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.cancelled_by !== 'admin' && booking.cancelled_by !== null && booking.cancelled_by !== '') {
+            req.flash('error', 'This booking was cancelled by the customer and cannot be reactivated here.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.available_seats === null) {
+            req.flash('error', 'This booking cannot be reactivated because the flight was removed.');
+            return res.redirect('/admin/bookings');
+        }
+        if (booking.passenger_count > booking.available_seats) {
+            req.flash('error', `Only ${booking.available_seats} seat(s) left on this flight - not enough to reactivate.`);
+            return res.redirect('/admin/bookings');
+        }
+
+        const seatNumbers = (booking.seat_numbers || '').split(',').map(s => s.trim()).filter(Boolean);
+
+        // Make sure the booking's original seats haven't been claimed by someone else
+        // since it was cancelled.
+        const seatCheckSql = 'SELECT seat_number FROM seats WHERE flight_id = ? AND seat_number IN (?) AND booking_id IS NOT NULL';
+        db.query(seatCheckSql, [booking.flight_id, seatNumbers], (err, takenRows) => {
+            if (err) throw err;
+            if (seatNumbers.length > 0 && takenRows.length > 0) {
+                req.flash('error', `Seat(s) ${takenRows.map(r => r.seat_number).join(', ')} have since been taken by another booking. Cannot reactivate.`);
+                return res.redirect('/admin/bookings');
+            }
+
+            db.query('UPDATE bookings SET status = ?, cancelled_by = NULL WHERE id = ?', ['confirmed', bookingId], (err) => {
+                if (err) throw err;
+
+                const claimSeats = (cb) => {
+                    if (seatNumbers.length === 0) return cb(null);
+                    const claimSeatsSql = 'UPDATE seats SET booking_id = ? WHERE flight_id = ? AND seat_number IN (?)';
+                    db.query(claimSeatsSql, [bookingId, booking.flight_id, seatNumbers], cb);
+                };
+
+                claimSeats((err) => {
+                    if (err) throw err;
+
+                    const updateSeatsSql = 'UPDATE flights SET available_seats = available_seats - ? WHERE id = ?';
+                    db.query(updateSeatsSql, [booking.passenger_count, booking.flight_id], (err) => {
+                        if (err) throw err;
+                        req.flash('success', 'Booking reactivated successfully!');
+                        res.redirect('/admin/bookings');
+                    });
+                });
+            });
+        });
+    });
+});
+
+
 
 
 // Starting the server

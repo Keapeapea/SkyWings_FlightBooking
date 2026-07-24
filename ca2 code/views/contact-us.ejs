@@ -3,21 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contact Us</title>
-
+    <title>Contact Us - SkyWings</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 
 <body>
+    <%- include('partials/navbar') %>
 
-<%- include('partials/navbar') %>
+    <div class="container">
+        <%- include('partials/flash') %>
 
+<<<<<<< HEAD
 <div class="container">
     <%- include('partials/flash') %>
+=======
+        <div class="form-card">
+            <h1>Contact Us</h1>
+>>>>>>> 41536c609c2c35d8a2b180635bd17050daffe100
 
-    <div class="form-card">
+            <form action="/contact-us" method="POST">
+                <div class="field">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
 
-        <h1>Contact Us</h1>
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
 
         <form action="/contact-us" method="POST">
             <div class="field">
